@@ -114,9 +114,9 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-The tag must match the version in `package.json` and
-`src-tauri/tauri.conf.json`; the workflow fails early if they differ. It builds
-and attaches:
+The tag must match the version in `package.json`, `src-tauri/tauri.conf.json`,
+`Cargo.toml`, and `src-tauri/Cargo.toml`; the workflow fails early if they differ.
+It builds and attaches:
 
 - **Windows x64** — NSIS `.exe` and `.msi`
 - **macOS Intel** (`x86_64`) — `.dmg`

@@ -25,9 +25,14 @@ jobs:
           tag="${GITHUB_REF_NAME#v}"
           config_version="$(node -p "require('./src-tauri/tauri.conf.json').version")"
           package_version="$(node -p "require('./package.json').version")"
+          cargo_version="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)"
+          app_cargo_version="$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -n1)"
 
-          if [ "$tag" != "$config_version" ] || [ "$tag" != "$package_version" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match src-tauri/tauri.conf.json ($config_version) and package.json ($package_version)."
+          if [ "$tag" != "$config_version" ] \
+            || [ "$tag" != "$package_version" ] \
+            || [ "$tag" != "$cargo_version" ] \
+            || [ "$tag" != "$app_cargo_version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME must match package.json ($package_version), src-tauri/tauri.conf.json ($config_version), Cargo.toml ($cargo_version), and src-tauri/Cargo.toml ($app_cargo_version)."
             exit 1
           fi
 
