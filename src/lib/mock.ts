@@ -290,6 +290,8 @@ export async function mockInvoke<T>(command: string, args?: Record<string, unkno
           hasUsers: state.users.length > 0,
           currentUser: currentUser(),
           lastEmail: state.settings.lastEmail,
+          registrationOpen: true,
+          runtime: "server",
         };
         return status;
       }
@@ -503,6 +505,8 @@ export async function mockInvoke<T>(command: string, args?: Record<string, unkno
           settingsPath: "~/Library/Application Support/ArchivePlayer/settings.json",
           databasePath: "~/Library/Application Support/ArchivePlayer/archiveplayer.db",
           appVersion: "0.1.0 (browser demo)",
+          canManageSettings: true,
+          runtime: "server",
         };
         return settings;
       }
@@ -527,6 +531,7 @@ export async function mockInvoke<T>(command: string, args?: Record<string, unkno
           dataDir: "~/Library/Application Support/ArchivePlayer (demo)",
           settingsPath: "~/Library/Application Support/ArchivePlayer/settings.json",
           databasePath: "~/Library/Application Support/ArchivePlayer/archiveplayer.db",
+          runtime: "server",
         };
       case "open_external":
         window.open(String(a.url ?? ""), "_blank", "noopener,noreferrer");

@@ -9,7 +9,7 @@ Original work Copyright (c) 2026 Jeppe Kjeldal
 Modifications Copyright (c) 2026 ArchivePlayer contributors
 
 The original project is an ASP.NET Core application. This rewrite reimplements
-its concept and feature set using Rust, Tauri, React, and SQLite.
+its concept and feature set using Rust, Tauri, Axum, React, and SQLite.
 
 The original author is credited in the application's Settings → About screen,
 the README, and the LICENSE file.

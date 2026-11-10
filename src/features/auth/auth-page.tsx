@@ -25,28 +25,36 @@ import { cn } from "@/lib/utils";
 
 type Mode = "login" | "register";
 
-const features = [
-  {
-    icon: Database,
-    title: "Your library, on your machine",
-    body: "A local SQLite catalog with watch history. No cloud, no telemetry.",
-  },
-  {
-    icon: Film,
-    title: "Public-domain cinema",
-    body: "Search Archive.org and stream directly from their archive.",
-  },
-  {
-    icon: Sparkles,
-    title: "Optional TMDB polish",
-    body: "Add a free TMDB key for posters, genres, and episode metadata.",
-  },
-];
+function featuresFor(isServer: boolean) {
+  return [
+    {
+      icon: Database,
+      title: isServer ? "Your library, on your server" : "Your library, on your machine",
+      body: isServer
+        ? "A private SQLite catalog on your server. No cloud, no telemetry."
+        : "A local SQLite catalog with watch history. No cloud, no telemetry.",
+    },
+    {
+      icon: Film,
+      title: "Public-domain cinema",
+      body: "Search Archive.org and stream directly from their archive.",
+    },
+    {
+      icon: Sparkles,
+      title: "Optional TMDB polish",
+      body: isServer
+        ? "The server owner can add a free TMDB key for posters, genres, and episodes."
+        : "Add a free TMDB key for posters, genres, and episode metadata.",
+    },
+  ];
+}
 
 export function AuthPage() {
   const auth = useAuthQuery();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const isServer = auth.data?.runtime === "server";
+  const features = featuresFor(isServer);
 
   const [mode, setMode] = useState<Mode | null>(null);
   const [email, setEmail] = useState("");
@@ -143,14 +151,17 @@ export function AuthPage() {
           <div className="max-w-lg">
             <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
               <ShieldCheck className="size-3.5" />
-              Local-first · No accounts in the cloud
+              {isServer
+                ? "Self-hosted · Your data stays on your server"
+                : "Local-first · No accounts in the cloud"}
             </p>
             <h1 className="text-balance font-heading text-5xl font-semibold leading-[1.05] tracking-tight">
               A cinema archive that belongs to you.
             </h1>
             <p className="mt-5 max-w-md text-pretty text-base leading-relaxed text-muted-foreground">
               Browse public-domain films and shows from the Internet Archive, organize them
-              your way, and pick up where you left off. Everything stays on this computer.
+              your way, and pick up where you left off.{" "}
+              {isServer ? "Everything stays on your server." : "Everything stays on this computer."}
             </p>
 
             <div className="mt-10 space-y-5">
@@ -192,8 +203,12 @@ export function AuthPage() {
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
               {isRegister
-                ? "Pick a local profile for your library. It never leaves this machine."
-                : "Sign in to your local ArchivePlayer profile."}
+                ? isServer
+                  ? "Create a profile on this server. Each profile has its own library and watch history."
+                  : "Pick a local profile for your library. It never leaves this machine."
+                : isServer
+                  ? "Sign in to your ArchivePlayer server."
+                  : "Sign in to your local ArchivePlayer profile."}
             </p>
 
             <form onSubmit={submit} className="mt-7 space-y-4">
@@ -272,12 +287,12 @@ export function AuthPage() {
               <div className="flex items-center justify-between rounded-lg border border-border/60 bg-card/40 px-3 py-2.5">
                 <div className="flex items-center gap-2 text-sm">
                   <LockKeyhole className="size-3.5 text-muted-foreground" />
-                  <span>Remember my email</span>
+                  <span>{isServer ? "Keep me signed in" : "Remember my email"}</span>
                 </div>
                 <Switch
                   checked={remember}
                   onCheckedChange={setRemember}
-                  aria-label="Remember my email"
+                  aria-label={isServer ? "Keep me signed in" : "Remember my email"}
                 />
               </div>
 
@@ -318,9 +333,9 @@ export function AuthPage() {
                       Sign in
                     </button>
                   </>
-                ) : (
+                ) : auth.data.registrationOpen ? (
                   <>
-                    Need another local profile?{" "}
+                    Need another profile?{" "}
                     <button
                       type="button"
                       className="font-medium text-foreground hover:underline"
@@ -332,7 +347,11 @@ export function AuthPage() {
                       Create one
                     </button>
                   </>
+                ) : (
+                  "Registration is closed on this server."
                 )
+              ) : isServer ? (
+                "Your library, watch history, and settings live in this server's database."
               ) : (
                 "Your library, watch history, and settings live in a local database."
               )}

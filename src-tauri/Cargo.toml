@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "A local-first media library for Archive.org"
 authors = ["Jeppe Kjeldal and ArchivePlayer contributors"]
 license = "MIT"
-repository = "https://github.com/JeppeKjeldal/ArchivePlayer"
+repository = "https://github.com/LovelessCodes/ArchivePlayer"
 edition = "2024"
 rust-version = "1.90"
 

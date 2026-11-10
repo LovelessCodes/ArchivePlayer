@@ -1,15 +1,21 @@
 # ArchivePlayer
 
-A local-first desktop media library for public-domain films and shows from
+A local-first media library for public-domain films and shows from
 [Archive.org](https://archive.org). Browse and search the Internet Archive, build
 your own shelves, and stream directly from their servers — while your catalog and
-watch history stay on your computer.
+watch history stay on your machine.
 
-This is a ground-up **Rust + Tauri** rewrite of
+ArchivePlayer runs in two shapes from the same Rust core:
+
+- **Desktop** — a native Tauri app for Windows, macOS, and Linux.
+- **Self-hosted** — a small Axum web server and Docker image. Put it on a home
+  server, NAS, or VPS and reach your library from any browser on your network.
+
+This is a ground-up **Rust** rewrite of
 [ArchivePlayer by Jeppe Kjeldal](https://github.com/JeppeKjeldal/ArchivePlayer),
-which was originally an ASP.NET Core MVC application. Prebuilt installers for
-Windows, macOS, and Linux are available on the
-[Releases](https://github.com/LovelessCodes/ArchivePlayer/releases) page.
+which was originally an ASP.NET Core MVC application. The desktop and server
+runtimes share the same domain crate. Prebuilt desktop installers are available
+on the [Releases](https://github.com/LovelessCodes/ArchivePlayer/releases) page.
 
 > **Attribution:** This project is derived from
 > [JeppeKjeldal/ArchivePlayer](https://github.com/JeppeKjeldal/ArchivePlayer).
@@ -29,8 +35,10 @@ Windows, macOS, and Linux are available on the
 - **Optional TMDB enrichment**: posters, genres, episode titles, descriptions, and
   category suggestions.
 - **Filename-based episode detection** when TMDB is not configured.
-- **Local profiles** with Argon2 password hashing and an in-process session.
-- **Local SQLite database** — no account server, telemetry, or cloud dependency.
+- **Profiles** with Argon2 password hashing. Desktop keeps the session in memory;
+  server mode uses random, hashed session cookies.
+- **SQLite catalog** — no account service, telemetry, or cloud dependency. Keep it
+  desktop-only, or run the server and share it with your devices.
 - **Clear watch history** or remove individual titles at any time.
 - A dark, responsive UI built with React 19, Tailwind CSS v4, and shadcn/ui
   components on [Base UI](https://base-ui.com/).
@@ -40,7 +48,8 @@ Windows, macOS, and Linux are available on the
 | Layer | Technology |
 | --- | --- |
 | Desktop shell | Tauri 2 |
-| Backend | Rust 2024 edition |
+| Web server | Axum + Tokio |
+| Backend | Rust 2024 edition, one shared `archiveplayer-core` crate |
 | Frontend | React 19, TypeScript, Vite |
 | Styling | Tailwind CSS v4, shadcn/ui (Base UI primitives) |
 | Data fetching | TanStack Query |
@@ -48,6 +57,7 @@ Windows, macOS, and Linux are available on the
 | Passwords | Argon2id |
 | HTTP | `reqwest` with rustls |
 | Metadata | Archive.org, optional TMDB v3 API |
+| Packaging | Tauri bundles, Docker / GHCR multi-arch image |
 
 ## Getting started
 
@@ -74,7 +84,53 @@ pnpm tauri dev
 
 The first Rust build takes a while. Tauri starts Vite automatically.
 
-### Run the UI in a browser
+### Run the self-hosted server
+
+Build the frontend once, then start the Axum server:
+
+```bash
+pnpm install
+pnpm build
+cargo run -p archiveplayer-server --release
+```
+
+Open `http://localhost:8080`. The first account you create is the **server owner**;
+after that, registration is closed unless you explicitly enable it. The server
+serves the built `dist/` directory and stores SQLite plus `settings.json` in
+`ARCHIVEPLAYER_DATA_DIR` (default `./data`).
+
+#### Docker
+
+```bash
+docker compose up -d --build
+```
+
+`compose.yaml` binds to `127.0.0.1:8080` and keeps data in the named volume
+`archiveplayer-data`. Open `http://localhost:8080` on the host. The container is
+multi-arch (`linux/amd64`, `linux/arm64`); published images are available at
+`ghcr.io/lovelesscodes/archiveplayer`.
+
+To reach it from other devices, put a TLS reverse proxy (Caddy, nginx, Traefik)
+in front of it and change the port mapping to `"8080:8080"` only on a trusted
+network. Set `ARCHIVEPLAYER_SECURE_COOKIES=true` when the public URL is HTTPS.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `ARCHIVEPLAYER_BIND` | `127.0.0.1:8080` (Docker: `0.0.0.0:8080`) | Listen address. |
+| `ARCHIVEPLAYER_DATA_DIR` | `data` (`/data` in Docker) | SQLite database and `settings.json`. |
+| `ARCHIVEPLAYER_STATIC_DIR` | `dist` (`/app/dist` in Docker) | Built frontend files. |
+| `ARCHIVEPLAYER_ALLOW_REGISTRATION` | `false` | Allow anyone to create an account after the owner. |
+| `ARCHIVEPLAYER_SECURE_COOKIES` | `false` | Mark session cookies `Secure`; enable behind HTTPS. |
+| `ARCHIVEPLAYER_SESSION_DAYS` | `30` | Session lifetime, clamped to 1–365 days. |
+
+Back up the volume before upgrades:
+
+```bash
+docker run --rm -v archiveplayer-data:/data -v "$PWD":/backup \
+  debian:bookworm-slim tar czf /backup/archiveplayer-data.tgz -C /data .
+```
+
+### Run the UI in a browser (mock backend)
 
 `pnpm dev` opens the React app at `http://localhost:1420` with a small
 in-memory/localStorage mock backend. This is useful for frontend work without
@@ -84,8 +140,13 @@ compiling Rust:
 pnpm dev
 ```
 
-The browser demo seeds a sample library after you create a local profile. The
-desktop app always uses the real Rust backend.
+The browser demo seeds a sample library after you create a local profile. It is
+only available in Vite development mode; the desktop app and the server build
+always use the real Rust backend.
+
+To point the Vite dev server at a running ArchivePlayer server instead, set
+`VITE_USE_MOCK=false`. `/api` is proxied to `http://127.0.0.1:8080` by default;
+set `ARCHIVEPLAYER_API` to use another address.
 
 ### Checks and tests
 
@@ -103,7 +164,8 @@ pnpm tauri build
 ```
 
 Bundles are written to `target/release/bundle/`. Use
-`pnpm tauri build --no-bundle` to produce just the binary.
+`pnpm tauri build --no-bundle` to produce just the binary. The standalone server
+binary is built with `cargo build --release -p archiveplayer-server`.
 
 ### Releases
 
@@ -128,32 +190,54 @@ The installers are currently **unsigned**. macOS may require right-click → **O
 the first time, and Windows SmartScreen may warn. Linux AppImage users may need
 to run `chmod +x` before launching.
 
+The `Docker image` workflow builds and pushes the multi-arch server image to GHCR
+on the same tag. Package visibility must be set to public once in the GitHub
+package settings if you want anonymous pulls.
+
+### Server data and sessions
+
+In server mode the same SQLite catalog is stored in `ARCHIVEPLAYER_DATA_DIR`:
+
+- `archiveplayer.db` — profiles, library, categories, watch history, sessions.
+- `settings.json` — last-used email and optional TMDB key (written with `0600`
+  permissions on Unix).
+
+The first registered account is the owner and the only account that can change
+the TMDB key. Sessions are random 32-byte tokens stored only as SHA-256 hashes,
+sent in an `HttpOnly`, `SameSite=Lax` cookie. Expired sessions are cleaned up
+when someone signs in or registers.
+
 ## How it works
 
 ```text
-┌────────────────────────────────────────────────────────────┐
-│ Tauri window                                               │
-│  React 19 + Tailwind + shadcn/ui                           │
-│    ↕ typed invoke() calls                                  │
-│  src-tauri: Tauri commands, session state, window setup    │
-│    ↕                                                       │
-│  crates/archiveplayer-core                                 │
-│    auth · settings · SQLite · Archive.org · TMDB · playback │
-└────────────────────────────────────────────────────────────┘
+┌──────────────────────────────┐   ┌──────────────────────────────┐
+│ Tauri window                 │   │ Browser                      │
+│  React 19 + Tailwind         │   │  React 19 + Tailwind         │
+│    ↕ typed invoke() calls    │   │    ↕ HTTP /api/*             │
+│  src-tauri commands          │   │  archiveplayer-server (Axum) │
+└──────────────┬───────────────┘   └──────────────┬───────────────┘
+               └───────────────┬──────────────────┘
+                               ▼
+                 crates/archiveplayer-core
+   auth · sessions · settings · SQLite · Archive.org · TMDB · playback
 ```
 
 - `src/` — React app, routes, feature pages, UI components, browser mock.
 - `src-tauri/` — Tauri entry point, commands, capabilities, and packaging config.
-- `crates/archiveplayer-core/` — framework-independent Rust domain logic:
+- `crates/archiveplayer-server/` — Axum HTTP API, cookie sessions, static file
+  serving, CSP/security headers, and Docker runtime.
+- `crates/archiveplayer-core/` — framework-independent Rust domain logic shared by
+  both runtimes:
   - `db.rs` + `migrations/` — users, library, categories, progress.
   - `archive.rs` — Archive.org advanced search and metadata.
   - `tmdb.rs` — optional TMDB matching, posters, and episodes.
   - `episodes.rs` — filename-based episode detection and matching.
-  - `service.rs` — orchestration used by the Tauri commands.
+  - `service.rs` — orchestration used by both the Tauri commands and HTTP routes.
 
-### Local data
+### Local data (desktop)
 
-The app stores its database and settings in the Tauri application data directory:
+The desktop app stores its database and settings in the Tauri application data
+directory:
 
 - **Linux:** `~/.local/share/io.github.jeppekjeldal.archiveplayer/`
 - **macOS:** `~/Library/Application Support/io.github.jeppekjeldal.archiveplayer/`
@@ -166,13 +250,19 @@ Files:
   permissions on Unix).
 
 Set `ARCHIVEPLAYER_DATA_DIR` to override the location (useful for portable setups
-or testing).
+or testing). The self-hosted server uses the same files under
+`ARCHIVEPLAYER_DATA_DIR` instead.
 
-### Profiles
+### Profiles and sessions
 
-Profiles are local to the machine. The session is held in memory, so closing the
-app signs you out; the library is preserved. Passwords are hashed with Argon2id;
-no plaintext password is stored.
+On desktop the session is held in memory, so closing the app signs you out; the
+library is preserved. On the server, the session is a hashed token in SQLite and
+the browser holds an `HttpOnly` cookie, so you stay signed in across restarts
+until the session expires or you sign out. Passwords are hashed with
+Argon2id; no plaintext password is stored.
+
+Each profile has its own library, categories, and watch history. Profiles do not
+share items with each other.
 
 ### TMDB (optional)
 
@@ -183,9 +273,10 @@ ArchivePlayer works without any API key. To enable richer metadata:
 3. Paste it into **Settings → TMDB metadata** in ArchivePlayer, then use
    **Test connection**.
 
-The key is stored only in the local `settings.json` file and is sent only to
-`api.themoviedb.org`. Without a key, the app uses Archive.org thumbnails and
-filename-based episode parsing.
+The key is stored only in `settings.json` and is sent only to
+`api.themoviedb.org`. On the server, only the owner can view or change it; other
+profiles never receive the key. Without a key, ArchivePlayer uses Archive.org
+thumbnails and filename-based episode parsing.
 
 ## Playback and privacy
 
@@ -196,6 +287,8 @@ filename-based episode parsing.
 - Network access is limited to Archive.org, TMDB (only with a key), and the
   external links you explicitly open.
 - There is no analytics, telemetry, or remote account system.
+- The self-hosted server has no built-in TLS. Run it behind a TLS reverse proxy
+  before exposing it outside your network, and enable `ARCHIVEPLAYER_SECURE_COOKIES`.
 - ArchivePlayer is not affiliated with the Internet Archive or TMDB.
 
 ## Known limitations
@@ -205,8 +298,8 @@ filename-based episode parsing.
   prefers `.mp4` files when an item has several video formats.
 - Episode matching is heuristic when TMDB is not configured or cannot find a
   match.
-- The app manages a local single-machine library; it does not sync profiles or
-  watch history between devices.
+- Desktop keeps a single-machine library. The server shares one install across
+  devices, but profiles remain separate and there is no third-party sync.
 - Archive.org items can be removed or restricted by their uploaders at any time.
 
 ## License and attribution

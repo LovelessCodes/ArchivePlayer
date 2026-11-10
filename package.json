@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "check": "tsc -b",
+    "server": "cargo run -p archiveplayer-server --release",
     "tauri": "tauri"
   },
   "dependencies": {
@@ -38,5 +39,5 @@
     "typescript": "~7.0.2",
     "vite": "^8.3.6"
   },
-  "description": "A local-first desktop media library for Archive.org, built with Tauri, Rust, and React."
+  "description": "A local-first Archive.org media library for desktop and self-hosting, built with Rust, Tauri, Axum, and React."
 }

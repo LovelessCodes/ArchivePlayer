@@ -1,0 +1,27 @@
+[package]
+name = "archiveplayer-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Self-hosted web server for ArchivePlayer"
+
+[dependencies]
+archiveplayer-core = { path = "../archiveplayer-core" }
+axum = "0.8"
+axum-extra = { version = "0.12", features = ["cookie"] }
+chrono.workspace = true
+rand_core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2 = "0.10"
+time = "0.3"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "sync"] }
+tower-http = { version = "0.6", features = ["compression-gzip", "fs", "set-header", "trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+url.workspace = true
+
+[dev-dependencies]
+http-body-util = "0.1"
+tempfile = "3"
+tower = { version = "0.5", features = ["util"] }

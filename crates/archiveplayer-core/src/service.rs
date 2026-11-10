@@ -48,7 +48,12 @@ impl Service {
         })
     }
 
-    pub fn settings_info(&self, app_version: &str) -> SettingsInfo {
+    pub fn settings_info(
+        &self,
+        app_version: &str,
+        runtime: crate::models::RuntimeMode,
+        can_manage_settings: bool,
+    ) -> SettingsInfo {
         let settings = self.settings.get();
         SettingsInfo {
             tmdb_api_key: settings.tmdb_api_key.clone(),
@@ -58,6 +63,8 @@ impl Service {
             settings_path: self.settings.path().display().to_string(),
             database_path: self.database_path.display().to_string(),
             app_version: app_version.to_string(),
+            can_manage_settings,
+            runtime,
         }
     }
 

@@ -94,6 +94,8 @@ export function SettingsPage() {
   }
 
   const info = settings.data;
+  const isServer = info.runtime === "server";
+  const canManage = info.canManageSettings;
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 pb-8 pt-8 lg:px-8">
@@ -104,8 +106,9 @@ export function SettingsPage() {
         </p>
         <h1 className="font-heading text-3xl font-semibold tracking-tight">Settings</h1>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Your library is stored locally. Only streaming and the optional TMDB key need
-          network access; adding a key unlocks richer posters, genres, and episode details.
+          {isServer
+            ? "Your library is stored on this server. Only streaming and the optional TMDB key need network access; adding a key unlocks richer posters, genres, and episode details."
+            : "Your library is stored locally. Only streaming and the optional TMDB key need network access; adding a key unlocks richer posters, genres, and episode details."}
         </p>
       </header>
 
@@ -122,6 +125,9 @@ export function SettingsPage() {
                   <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
                     The Movie Database provides posters, genres, and episode listings. A free API
                     key is enough.
+                    {isServer && !canManage
+                      ? " Only the server owner can change it."
+                      : ""}
                   </p>
                 </div>
               </div>
@@ -141,6 +147,8 @@ export function SettingsPage() {
             </div>
 
             <div className="space-y-4 px-5 py-4">
+              {canManage ? (
+                <>
               <div className="space-y-2">
                 <Label htmlFor="tmdb-key">
                   {info.tmdbConfigured ? "Replace API key" : "API key"}
@@ -170,7 +178,9 @@ export function SettingsPage() {
                   </button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Stored only in this computer's settings file with restricted permissions.{" "}
+                  {isServer
+                    ? "Stored on the server with restricted permissions."
+                    : "Stored only in this computer's settings file with restricted permissions."}{" "}
                   <button
                     type="button"
                     className="text-foreground/80 underline-offset-2 hover:underline"
@@ -221,6 +231,21 @@ export function SettingsPage() {
                   episode detection. Your library still works exactly the same.
                 </p>
               </div>
+                </>
+              ) : (
+                <div className="flex items-start gap-3 rounded-lg border border-border/60 bg-background/40 p-3.5">
+                  <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" />
+                  <div className="space-y-1 text-xs leading-relaxed text-muted-foreground">
+                    <p className="font-medium text-foreground">Managed by the server owner</p>
+                    <p>
+                      {info.tmdbConfigured
+                        ? "A TMDB key is configured, so richer posters and episode metadata are available."
+                        : "No TMDB key is configured yet. Archive.org thumbnails and filename-based episodes are used instead."}
+                    </p>
+                    <p>Only the server owner can view or change this key.</p>
+                  </div>
+                </div>
+              )}
             </div>
           </section>
 
@@ -230,9 +255,11 @@ export function SettingsPage() {
                 <Database className="size-4" />
               </div>
               <div>
-                <h2 className="text-sm font-semibold">Local data</h2>
+                <h2 className="text-sm font-semibold">{isServer ? "Server data" : "Local data"}</h2>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Your profiles, catalog, and watch history live on this machine.
+                  {isServer
+                    ? "Profiles, catalog, and watch history live on this server."
+                    : "Your profiles, catalog, and watch history live on this machine."}
                 </p>
               </div>
             </div>
@@ -242,7 +269,9 @@ export function SettingsPage() {
               <InfoRow label="Settings file" value={info.settingsPath} />
             </dl>
             <div className="border-t border-border/60 px-5 py-3 text-xs text-muted-foreground">
-              Closing the app signs you out. Your library is kept for the next launch.
+              {isServer
+                ? "Signing out ends this browser session. Your library is kept on the server."
+                : "Closing the app signs you out. Your library is kept for the next launch."}
             </div>
           </section>
 
@@ -260,7 +289,8 @@ export function SettingsPage() {
             </div>
             <div className="space-y-3 px-5 py-4 text-xs leading-relaxed text-muted-foreground">
               <p>
-                This app is a Rust + Tauri rewrite of{" "}
+                This app is a{" "}
+                {isServer ? "Rust server edition" : "Rust + Tauri rewrite"} of{" "}
                 <button
                   type="button"
                   className="font-medium text-foreground underline-offset-2 hover:underline"
@@ -312,11 +342,13 @@ export function SettingsPage() {
             <ul className="space-y-2.5 text-xs leading-relaxed text-muted-foreground">
               <li className="flex gap-2">
                 <Check className="mt-0.5 size-3.5 shrink-0 text-primary" />
-                Tauri shell with a Rust backend and React frontend.
+                {isServer
+                  ? "Axum web server with a Rust backend and React frontend."
+                  : "Tauri shell with a Rust backend and React frontend."}
               </li>
               <li className="flex gap-2">
                 <Check className="mt-0.5 size-3.5 shrink-0 text-primary" />
-                SQLite catalog and Argon2-hashed local profiles.
+                SQLite catalog and Argon2-hashed profiles.
               </li>
               <li className="flex gap-2">
                 <Check className="mt-0.5 size-3.5 shrink-0 text-primary" />

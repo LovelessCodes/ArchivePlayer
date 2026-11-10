@@ -19,12 +19,21 @@ impl User {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RuntimeMode {
+    Desktop,
+    Server,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthStatus {
     pub has_users: bool,
     pub current_user: Option<User>,
     pub last_email: Option<String>,
+    pub registration_open: bool,
+    pub runtime: RuntimeMode,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -156,6 +165,8 @@ pub struct SettingsInfo {
     pub settings_path: String,
     pub database_path: String,
     pub app_version: String,
+    pub can_manage_settings: bool,
+    pub runtime: RuntimeMode,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -165,6 +176,7 @@ pub struct AppInfo {
     pub data_dir: String,
     pub settings_path: String,
     pub database_path: String,
+    pub runtime: RuntimeMode,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

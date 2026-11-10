@@ -29,6 +29,9 @@ pub enum CoreError {
     Unauthorized,
 
     #[error("{0}")]
+    Forbidden(String),
+
+    #[error("{0}")]
     Message(String),
 }
 
@@ -43,6 +46,7 @@ impl CoreError {
             Self::Conflict(_) => "conflict",
             Self::Invalid(_) => "invalid",
             Self::Unauthorized => "unauthorized",
+            Self::Forbidden(_) => "forbidden",
             Self::Message(_) => "error",
         }
     }

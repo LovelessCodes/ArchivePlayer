@@ -7,6 +7,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 const SCHEMA: &str = include_str!("../migrations/001_init.sql");
+const SESSION_SCHEMA: &str = include_str!("../migrations/002_sessions.sql");
 
 const LIBRARY_SELECT: &str = r#"
     SELECT
@@ -103,6 +104,7 @@ impl Database {
              PRAGMA synchronous = NORMAL;",
         )?;
         connection.execute_batch(SCHEMA)?;
+        connection.execute_batch(SESSION_SCHEMA)?;
         Ok(Self {
             connection: Mutex::new(connection),
         })
@@ -200,6 +202,70 @@ impl Database {
                     },
                 )
                 .optional()?)
+        })
+    }
+
+    /// The first account created owns server-wide settings such as the TMDB key.
+    pub fn first_user_id(&self) -> CoreResult<Option<i64>> {
+        self.with_connection(|conn| {
+            Ok(conn.query_row("SELECT MIN(id) FROM users", [], |row| row.get(0))?)
+        })
+    }
+
+    // ------------------------------------------------------------- sessions
+
+    pub fn create_session(
+        &self,
+        token_hash: &str,
+        user_id: i64,
+        expires_at: i64,
+    ) -> CoreResult<()> {
+        self.with_connection(|conn| {
+            conn.execute(
+                "INSERT INTO sessions (token_hash, user_id, expires_at, created_at)
+                 VALUES (?1, ?2, ?3, ?4)",
+                params![token_hash, user_id, expires_at, now_rfc3339()],
+            )?;
+            Ok(())
+        })
+    }
+
+    pub fn session_user(&self, token_hash: &str, now: i64) -> CoreResult<Option<User>> {
+        self.with_connection(|conn| {
+            Ok(conn
+                .query_row(
+                    "SELECT u.id, u.email, u.display_name, u.created_at
+                     FROM sessions s
+                     JOIN users u ON u.id = s.user_id
+                     WHERE s.token_hash = ?1 AND s.expires_at > ?2",
+                    params![token_hash, now],
+                    |row| {
+                        Ok(User {
+                            id: row.get(0)?,
+                            email: row.get(1)?,
+                            display_name: row.get(2)?,
+                            created_at: row.get(3)?,
+                        })
+                    },
+                )
+                .optional()?)
+        })
+    }
+
+    pub fn delete_session(&self, token_hash: &str) -> CoreResult<()> {
+        self.with_connection(|conn| {
+            conn.execute(
+                "DELETE FROM sessions WHERE token_hash = ?1",
+                params![token_hash],
+            )?;
+            Ok(())
+        })
+    }
+
+    pub fn delete_expired_sessions(&self, now: i64) -> CoreResult<()> {
+        self.with_connection(|conn| {
+            conn.execute("DELETE FROM sessions WHERE expires_at <= ?1", params![now])?;
+            Ok(())
         })
     }
 
@@ -771,6 +837,27 @@ mod tests {
         db.mark_completed(user.id, &media.identifier, "S01E02.mp4", true)
             .unwrap();
         assert!(db.continue_watching(user.id, 10).unwrap().is_empty());
+    }
+
+    #[test]
+    fn stores_expires_and_deletes_sessions() {
+        let db = database();
+        let user = seed_user(&db);
+
+        db.create_session("token-hash", user.id, 200).unwrap();
+        assert_eq!(
+            db.session_user("token-hash", 100).unwrap().unwrap().id,
+            user.id
+        );
+        assert!(db.session_user("token-hash", 200).unwrap().is_none());
+
+        db.delete_expired_sessions(200).unwrap();
+        assert!(db.session_user("token-hash", 100).unwrap().is_none());
+
+        db.create_session("other-hash", user.id, 300).unwrap();
+        db.delete_session("other-hash").unwrap();
+        assert!(db.session_user("other-hash", 100).unwrap().is_none());
+        assert_eq!(db.first_user_id().unwrap(), Some(user.id));
     }
 
     #[test]

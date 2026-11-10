@@ -1,0 +1,15 @@
+.git
+.github
+node_modules
+target
+src-tauri/target
+dist
+dist-ssr
+data
+*.db
+*.db-shm
+*.db-wal
+*.log
+.DS_Store
+.vscode
+.idea

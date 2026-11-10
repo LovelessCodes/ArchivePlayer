@@ -1,6 +1,6 @@
 use crate::state::AppState;
 use archiveplayer_core::auth::{hash_password, validate_email, verify_password};
-use archiveplayer_core::models::{AuthStatus, User};
+use archiveplayer_core::models::{AuthStatus, RuntimeMode, User};
 use archiveplayer_core::{CoreError, CoreResult};
 use tauri::State;
 
@@ -10,6 +10,8 @@ pub fn auth_status(state: State<'_, AppState>) -> CoreResult<AuthStatus> {
         has_users: state.service.db.user_count()? > 0,
         current_user: state.current_user_opt()?,
         last_email: state.service.settings.get().last_email,
+        registration_open: true,
+        runtime: RuntimeMode::Desktop,
     })
 }
 

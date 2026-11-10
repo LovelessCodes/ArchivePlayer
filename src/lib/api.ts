@@ -26,9 +26,192 @@ function isTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
-export async function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+function usingMockBackend(): boolean {
+  return (
+    !isTauri() &&
+    import.meta.env.DEV &&
+    import.meta.env.VITE_USE_MOCK !== "false"
+  );
+}
+
+interface HttpRequest {
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  path: string;
+  body?: unknown;
+}
+
+function segment(value: string | number): string {
+  return encodeURIComponent(String(value));
+}
+
+function httpRequestFor(
+  command: string,
+  args: Record<string, unknown> = {},
+): HttpRequest {
+  switch (command) {
+    case "auth_status":
+      return { method: "GET", path: "/api/auth/status" };
+    case "register":
+      return {
+        method: "POST",
+        path: "/api/auth/register",
+        body: {
+          email: args.email,
+          password: args.password,
+          displayName: args.displayName,
+          remember: args.remember,
+        },
+      };
+    case "login":
+      return {
+        method: "POST",
+        path: "/api/auth/login",
+        body: {
+          email: args.email,
+          password: args.password,
+          remember: args.remember,
+        },
+      };
+    case "logout":
+      return { method: "POST", path: "/api/auth/logout" };
+    case "get_library":
+      return { method: "GET", path: "/api/library" };
+    case "get_continue_watching":
+      return {
+        method: "GET",
+        path: `/api/library/continue-watching?limit=${segment(Number(args.limit ?? 10))}`,
+      };
+    case "add_to_library":
+      return {
+        method: "POST",
+        path: "/api/library",
+        body: {
+          identifier: args.identifier,
+          categoryName: args.categoryName,
+        },
+      };
+    case "remove_from_library":
+      return { method: "DELETE", path: `/api/library/${segment(Number(args.id))}` };
+    case "clear_watch_history":
+      return {
+        method: "DELETE",
+        path: `/api/library/${segment(Number(args.id))}/history`,
+      };
+    case "set_autoplay":
+      return {
+        method: "PATCH",
+        path: `/api/library/${segment(Number(args.id))}/autoplay`,
+        body: { enabled: args.enabled },
+      };
+    case "search_archive":
+      return {
+        method: "GET",
+        path: `/api/search?q=${encodeURIComponent(String(args.query ?? ""))}&page=${segment(Number(args.page ?? 1))}`,
+      };
+    case "get_category_suggestions":
+      return {
+        method: "GET",
+        path: `/api/category-suggestions/${segment(String(args.identifier ?? ""))}`,
+      };
+    case "get_playback_details":
+      return {
+        method: "GET",
+        path: `/api/playback/${segment(String(args.identifier ?? ""))}`,
+      };
+    case "save_progress":
+      return {
+        method: "PUT",
+        path: `/api/playback/${segment(String(args.identifier ?? ""))}/progress`,
+        body: {
+          fileName: args.fileName,
+          positionSeconds: args.positionSeconds,
+          durationSeconds: args.durationSeconds,
+        },
+      };
+    case "mark_completed":
+      return {
+        method: "POST",
+        path: `/api/playback/${segment(String(args.identifier ?? ""))}/completed`,
+        body: {
+          fileName: args.fileName,
+          itemCompleted: args.itemCompleted,
+        },
+      };
+    case "get_settings":
+      return { method: "GET", path: "/api/settings" };
+    case "save_tmdb_key":
+      return {
+        method: "PUT",
+        path: "/api/settings/tmdb",
+        body: { apiKey: args.apiKey },
+      };
+    case "clear_tmdb_key":
+      return { method: "DELETE", path: "/api/settings/tmdb" };
+    case "test_tmdb_key":
+      return { method: "POST", path: "/api/settings/tmdb/test" };
+    case "get_app_info":
+      return { method: "GET", path: "/api/app-info" };
+    default:
+      throw new ApiError(`Unknown command: ${command}`, "not_found");
+  }
+}
+
+async function httpCall<T>(
+  command: string,
+  args?: Record<string, unknown>,
+): Promise<T> {
+  const request = httpRequestFor(command, args);
+  let response: Response;
+
+  try {
+    response = await fetch(request.path, {
+      method: request.method,
+      credentials: "include",
+      headers:
+        request.body === undefined
+          ? undefined
+          : { "Content-Type": "application/json" },
+      body:
+        request.body === undefined ? undefined : JSON.stringify(request.body),
+    });
+  } catch {
+    throw new ApiError(
+      "Could not reach the ArchivePlayer server. Is it running?",
+      "network",
+    );
+  }
+
+  const text = await response.text();
+  let payload: unknown = null;
+  if (text) {
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = null;
+    }
+  }
+
+  if (!response.ok) {
+    const error = (payload ?? {}) as { message?: unknown; code?: unknown };
+    throw new ApiError(
+      String(error.message ?? `The server returned ${response.status}.`),
+      typeof error.code === "string" ? error.code : `http_${response.status}`,
+    );
+  }
+
+  if (response.status === 204 || !text) {
+    return undefined as T;
+  }
+
+  return payload as T;
+}
+
+export async function call<T>(
+  command: string,
+  args?: Record<string, unknown>,
+): Promise<T> {
   if (!isTauri()) {
-    return mockInvoke<T>(command, args);
+    return usingMockBackend() ? mockInvoke<T>(command, args) : httpCall<T>(command, args);
   }
 
   try {
@@ -43,6 +226,18 @@ export async function call<T>(command: string, args?: Record<string, unknown>): 
     }
     throw new ApiError(String(error ?? "Something went wrong."));
   }
+}
+
+export async function openExternalUrl(url: string): Promise<void> {
+  if (isTauri()) {
+    await call<void>("open_external", { url });
+    return;
+  }
+  if (usingMockBackend()) {
+    await mockInvoke<void>("open_external", { url });
+    return;
+  }
+  window.open(url, "_blank", "noopener,noreferrer");
 }
 
 export function errorMessage(error: unknown): string {
@@ -94,5 +289,5 @@ export const api = {
   clearTmdbKey: () => call<void>("clear_tmdb_key"),
   testTmdbKey: () => call<void>("test_tmdb_key"),
   getAppInfo: () => call<AppInfo>("get_app_info"),
-  openExternal: (url: string) => call<void>("open_external", { url }),
+  openExternal: openExternalUrl,
 };

@@ -1,5 +1,5 @@
 use crate::state::AppState;
-use archiveplayer_core::models::{AppInfo, SettingsInfo};
+use archiveplayer_core::models::{AppInfo, RuntimeMode, SettingsInfo};
 use archiveplayer_core::{CoreError, CoreResult};
 use tauri::{AppHandle, State};
 use tauri_plugin_opener::OpenerExt;
@@ -8,9 +8,11 @@ use url::Url;
 #[tauri::command]
 pub fn get_settings(app: AppHandle, state: State<'_, AppState>) -> CoreResult<SettingsInfo> {
     state.current_user()?;
-    Ok(state
-        .service
-        .settings_info(&app.package_info().version.to_string()))
+    Ok(state.service.settings_info(
+        &app.package_info().version.to_string(),
+        RuntimeMode::Desktop,
+        true,
+    ))
 }
 
 #[tauri::command]
@@ -47,6 +49,7 @@ pub fn get_app_info(app: AppHandle, state: State<'_, AppState>) -> CoreResult<Ap
         data_dir: state.service.data_dir.display().to_string(),
         settings_path: state.service.settings.path().display().to_string(),
         database_path: state.service.database_path.display().to_string(),
+        runtime: RuntimeMode::Desktop,
     })
 }
 

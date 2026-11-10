@@ -144,7 +144,7 @@ export function AppShell() {
 
       <footer className="mx-auto mt-12 flex w-full max-w-7xl flex-col gap-2 border-t border-border/50 px-4 py-5 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between lg:px-8">
         <p>
-          Local-first media library · Streams from{" "}
+          {auth?.runtime === "server" ? "Self-hosted" : "Local-first"} media library · Streams from{" "}
           <button
             type="button"
             className="text-foreground/80 underline-offset-2 hover:underline"

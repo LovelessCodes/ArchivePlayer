@@ -27,6 +27,12 @@ export default defineConfig({
     watch: {
       ignored: ["**/src-tauri/**", "**/target/**"],
     },
+    proxy: {
+      "/api": {
+        target: process.env.ARCHIVEPLAYER_API ?? "http://127.0.0.1:8080",
+        changeOrigin: false,
+      },
+    },
   },
   envPrefix: ["VITE_", "TAURI_"],
   build: {

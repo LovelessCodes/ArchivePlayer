@@ -5,10 +5,14 @@ export interface User {
   createdAt: string;
 }
 
+export type RuntimeMode = "desktop" | "server";
+
 export interface AuthStatus {
   hasUsers: boolean;
   currentUser: User | null;
   lastEmail: string | null;
+  registrationOpen: boolean;
+  runtime: RuntimeMode;
 }
 
 export interface LibraryItem {
@@ -108,6 +112,8 @@ export interface SettingsInfo {
   settingsPath: string;
   databasePath: string;
   appVersion: string;
+  canManageSettings: boolean;
+  runtime: RuntimeMode;
 }
 
 export interface AppInfo {
@@ -115,4 +121,5 @@ export interface AppInfo {
   dataDir: string;
   settingsPath: string;
   databasePath: string;
+  runtime: RuntimeMode;
 }
