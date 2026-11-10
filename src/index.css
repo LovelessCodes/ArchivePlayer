@@ -1,0 +1,183 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource-variable/geist";
+
+@custom-variant dark (&:is(.dark *));
+
+@custom-variant data-open {
+  &:where([data-state="open"]),
+  &:where([data-open]:not([data-open="false"])) {
+    @slot;
+  }
+}
+@custom-variant data-closed {
+  &:where([data-state="closed"]),
+  &:where([data-closed]:not([data-closed="false"])) {
+    @slot;
+  }
+}
+@custom-variant data-checked {
+  &:where([data-state="checked"]),
+  &:where([data-checked]:not([data-checked="false"])) {
+    @slot;
+  }
+}
+@custom-variant data-unchecked {
+  &:where([data-state="unchecked"]),
+  &:where([data-unchecked]:not([data-unchecked="false"])) {
+    @slot;
+  }
+}
+@custom-variant data-selected {
+  &:where([data-selected="true"]) {
+    @slot;
+  }
+}
+@custom-variant data-disabled {
+  &:where([data-disabled="true"]),
+  &:where([data-disabled]:not([data-disabled="false"])) {
+    @slot;
+  }
+}
+@custom-variant data-active {
+  &:where([data-state="active"]),
+  &:where([data-active]:not([data-active="false"])) {
+    @slot;
+  }
+}
+@custom-variant data-horizontal {
+  &:where([data-orientation="horizontal"]) {
+    @slot;
+  }
+}
+@custom-variant data-vertical {
+  &:where([data-orientation="vertical"]) {
+    @slot;
+  }
+}
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: oklch(0.13 0.005 285);
+  --foreground: oklch(0.97 0.002 285);
+  --card: oklch(0.17 0.006 285);
+  --card-foreground: oklch(0.97 0.002 285);
+  --popover: oklch(0.17 0.006 285);
+  --popover-foreground: oklch(0.97 0.002 285);
+  --primary: oklch(0.58 0.225 25);
+  --primary-foreground: oklch(0.99 0.002 285);
+  --secondary: oklch(0.23 0.008 285);
+  --secondary-foreground: oklch(0.97 0.002 285);
+  --muted: oklch(0.22 0.006 285);
+  --muted-foreground: oklch(0.68 0.008 285);
+  --accent: oklch(0.25 0.009 285);
+  --accent-foreground: oklch(0.97 0.002 285);
+  --destructive: oklch(0.62 0.22 25);
+  --destructive-foreground: oklch(0.99 0.002 285);
+  --border: oklch(1 0.002 285 / 11%);
+  --input: oklch(1 0.002 285 / 16%);
+  --ring: oklch(0.62 0.19 25);
+  --chart-1: oklch(0.62 0.22 25);
+  --chart-2: oklch(0.7 0.16 80);
+  --chart-3: oklch(0.65 0.12 200);
+  --chart-4: oklch(0.6 0.16 300);
+  --chart-5: oklch(0.7 0.13 150);
+  --radius: 0.75rem;
+  --sidebar: oklch(0.15 0.005 285);
+  --sidebar-foreground: oklch(0.97 0.002 285);
+  --sidebar-primary: oklch(0.58 0.225 25);
+  --sidebar-primary-foreground: oklch(0.99 0.002 285);
+  --sidebar-accent: oklch(0.23 0.008 285);
+  --sidebar-accent-foreground: oklch(0.97 0.002 285);
+  --sidebar-border: oklch(1 0.002 285 / 10%);
+  --sidebar-ring: oklch(0.62 0.19 25);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans antialiased;
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-background text-foreground;
+    min-height: 100vh;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 45%, transparent);
+  }
+}
+
+@utility no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility text-balance {
+  text-wrap: balance;
+}
+
+@layer utilities {
+  .app-background {
+    background-image:
+      radial-gradient(ellipse 80% 50% at 20% -10%, oklch(0.58 0.225 25 / 14%), transparent 60%),
+      radial-gradient(ellipse 60% 50% at 90% 0%, oklch(0.45 0.12 280 / 10%), transparent 60%);
+  }
+
+  .poster-shadow {
+    box-shadow: 0 24px 60px -30px oklch(0 0 0 / 0.9);
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+}

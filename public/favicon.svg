@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#17171b"/>
+      <stop offset="1" stop-color="#08080a"/>
+    </linearGradient>
+    <linearGradient id="red" x1="0.15" y1="0" x2="0.9" y2="1">
+      <stop offset="0" stop-color="#ff5a4e"/>
+      <stop offset="1" stop-color="#c8102e"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.42" r="0.55">
+      <stop offset="0" stop-color="#ff4438" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#ff4438" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="url(#bg)"/>
+  <rect x="22" y="22" width="980" height="980" rx="204" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="4"/>
+  <circle cx="512" cy="512" r="470" fill="url(#glow)"/>
+  <circle cx="512" cy="512" r="306" fill="url(#red)"/>
+  <circle cx="512" cy="512" r="306" fill="none" stroke="#ffffff" stroke-opacity="0.18" stroke-width="3"/>
+  <path d="M432 356 L716 512 L432 668 Z" fill="#ffffff"/>
+</svg>

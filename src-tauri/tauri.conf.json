@@ -1,0 +1,46 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "ArchivePlayer",
+  "version": "0.1.0",
+  "identifier": "io.github.jeppekjeldal.archiveplayer",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "ArchivePlayer",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 960,
+        "minHeight": 640,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "theme": "Dark",
+        "backgroundColor": "#0b0b0d"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost data: blob: https://archive.org https://*.archive.org https://image.tmdb.org; media-src 'self' blob: https://archive.org https://*.archive.org; connect-src 'self' ipc: http://ipc.localhost https://archive.org https://*.archive.org https://api.themoviedb.org ws://localhost:1420; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:;"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Entertainment",
+    "shortDescription": "Your local Archive.org media library",
+    "longDescription": "Browse and organize public-domain movies and shows from Archive.org in a local-first desktop app. Your library, watch history, and settings stay on your machine.",
+    "copyright": "MIT licensed. Derived from ArchivePlayer by Jeppe Kjeldal.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}
