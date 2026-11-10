@@ -168,6 +168,7 @@ jobs:
           generate_release_notes: true
           draft: false
           prerelease: false
+          fail_on_unmatched_files: true
           files: |
             artifacts/**/*.dmg
             artifacts/**/*.deb
