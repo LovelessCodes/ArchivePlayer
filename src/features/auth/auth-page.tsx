@@ -10,8 +10,9 @@ import {
   LockKeyhole,
   ShieldCheck,
   Sparkles,
+  WifiOff,
 } from "lucide-react";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,18 @@ export function AuthPage() {
   const navigate = useNavigate();
   const isServer = auth.data?.runtime === "server";
   const features = featuresFor(isServer);
+  const offline = typeof navigator !== "undefined" && !navigator.onLine;
+
+  const refetchRef = useRef(auth.refetch);
+  useEffect(() => {
+    refetchRef.current = auth.refetch;
+  }, [auth.refetch]);
+
+  useEffect(() => {
+    const reconnect = () => void refetchRef.current();
+    window.addEventListener("online", reconnect);
+    return () => window.removeEventListener("online", reconnect);
+  }, []);
 
   const [mode, setMode] = useState<Mode | null>(null);
   const [email, setEmail] = useState("");
@@ -91,7 +104,7 @@ export function AuthPage() {
 
   if (auth.isLoading) {
     return (
-      <div className="app-background grid min-h-screen place-items-center">
+      <div className="app-background grid min-h-dvh place-items-center">
         <div className="flex flex-col items-center gap-4">
           <Logo />
           <Loader2 className="size-6 animate-spin text-muted-foreground" />
@@ -102,10 +115,21 @@ export function AuthPage() {
 
   if (auth.isError) {
     return (
-      <div className="app-background grid min-h-screen place-items-center px-4">
+      <div className="app-background grid min-h-dvh place-items-center px-4">
         <div className="max-w-md rounded-2xl border border-border bg-card p-6 text-center">
-          <h1 className="font-heading text-xl font-semibold">ArchivePlayer could not start</h1>
-          <p className="mt-2 text-sm text-muted-foreground">{errorMessage(auth.error)}</p>
+          {offline && (
+            <div className="mx-auto mb-3 grid size-10 place-items-center rounded-full bg-amber-400/10 text-amber-300">
+              <WifiOff className="size-5" />
+            </div>
+          )}
+          <h1 className="font-heading text-xl font-semibold">
+            {offline ? "You're offline" : "ArchivePlayer could not start"}
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {offline
+              ? "Reconnect to reach your ArchivePlayer server. The app shell is cached, but your library and streams are not."
+              : errorMessage(auth.error)}
+          </p>
           <Button className="mt-5" onClick={() => auth.refetch()}>
             Try again
           </Button>
@@ -116,7 +140,7 @@ export function AuthPage() {
 
   if (!mode) {
     return (
-      <div className="app-background grid min-h-screen place-items-center">
+      <div className="app-background grid min-h-dvh place-items-center">
         <div className="flex flex-col items-center gap-4">
           <Logo />
           <Loader2 className="size-6 animate-spin text-muted-foreground" />
@@ -142,8 +166,8 @@ export function AuthPage() {
   }
 
   return (
-    <div className="app-background min-h-screen">
-      <div className="mx-auto grid min-h-screen w-full max-w-7xl grid-cols-1 lg:grid-cols-[1.05fr_0.95fr]">
+    <div className="app-background min-h-dvh">
+      <div className="mx-auto grid min-h-dvh w-full max-w-7xl grid-cols-1 lg:grid-cols-[1.05fr_0.95fr]">
         <section className="relative hidden flex-col justify-between overflow-hidden border-r border-border/50 p-12 lg:flex">
           <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_15%_10%,oklch(0.58_0.225_25/0.16),transparent_45%),radial-gradient(circle_at_85%_85%,oklch(0.4_0.12_280/0.14),transparent_45%)]" />
           <Logo />
@@ -187,7 +211,7 @@ export function AuthPage() {
           </p>
         </section>
 
-        <section className="flex flex-col justify-center px-5 py-10 sm:px-10 lg:px-16">
+        <section className="flex flex-col justify-center px-5 pb-[calc(2.5rem+env(safe-area-inset-bottom))] pt-[calc(2.5rem+env(safe-area-inset-top))] sm:px-10 lg:px-16 lg:py-10">
           <div className="mb-8 flex items-center justify-between lg:hidden">
             <Logo />
           </div>

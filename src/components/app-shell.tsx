@@ -2,11 +2,14 @@ import { useMutation } from "@tanstack/react-query";
 import {
   ChevronDown,
   GitBranch,
+  House,
   LogOut,
   Plus,
   Settings,
   UserRound,
+  WifiOff,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
@@ -39,8 +42,23 @@ export function AppShell() {
   const user = auth?.currentUser;
   const location = useLocation();
   const navigate = useNavigate();
-  const hideAddButton =
-    location.pathname.startsWith("/watch/") || location.pathname === "/add";
+  const [online, setOnline] = useState(() =>
+    typeof navigator === "undefined" ? true : navigator.onLine,
+  );
+  const isWatchPage = location.pathname.startsWith("/watch/");
+  const hideAddButton = isWatchPage || location.pathname === "/add";
+  const showMobileNav = !isWatchPage;
+
+  useEffect(() => {
+    const goOnline = () => setOnline(true);
+    const goOffline = () => setOnline(false);
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+  }, []);
 
   const logout = useMutation({
     mutationFn: api.logout,
@@ -51,9 +69,15 @@ export function AppShell() {
   });
 
   return (
-    <div className="app-background flex min-h-screen flex-col">
-      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-14 w-full max-w-7xl items-center gap-5 px-4 lg:px-8">
+    <div
+      className={cn(
+        "app-background flex min-h-dvh flex-col",
+        showMobileNav &&
+          "pb-[calc(4.75rem+env(safe-area-inset-bottom))] sm:pb-0",
+      )}
+    >
+      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
+        <div className="mx-auto flex h-14 w-full max-w-7xl items-center gap-3 px-4 sm:gap-5 lg:px-8">
           <Logo />
           <nav className="ml-2 hidden items-center gap-1 sm:flex">
             <NavLink to="/" end className={navClass}>
@@ -79,7 +103,7 @@ export function AppShell() {
             <Button
               variant="ghost"
               size="icon-sm"
-              className="rounded-full"
+              className="hidden rounded-full sm:inline-flex"
               aria-label="Settings"
               onClick={() => navigate("/settings")}
             >
@@ -138,6 +162,18 @@ export function AppShell() {
         </div>
       </header>
 
+      {!online && (
+        <div
+          role="status"
+          className="border-b border-amber-400/20 bg-amber-400/10 px-4 py-2 text-xs text-amber-100/90"
+        >
+          <div className="mx-auto flex max-w-7xl items-center gap-2">
+            <WifiOff className="size-3.5 shrink-0" />
+            You're offline. Your library and Archive.org streams need a connection.
+          </div>
+        </div>
+      )}
+
       <main className="flex-1">
         <Outlet />
       </main>
@@ -160,6 +196,47 @@ export function AppShell() {
           </Link>
         </div>
       </footer>
+
+      {showMobileNav && (
+        <nav
+          aria-label="Primary"
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-background pb-[env(safe-area-inset-bottom)] shadow-[0_-12px_36px_-18px_rgba(0,0,0,0.9)] sm:hidden"
+        >
+          <div className="mx-auto grid max-w-md grid-cols-3 px-2">
+            {[
+              { to: "/", label: "Home", icon: House, end: true },
+              { to: "/add", label: "Add", icon: Plus, end: false },
+              { to: "/settings", label: "Settings", icon: Settings, end: false },
+            ].map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) =>
+                  cn(
+                    "flex min-h-16 flex-col items-center justify-center gap-1 text-[0.65rem] font-medium transition-colors",
+                    isActive ? "text-foreground" : "text-muted-foreground",
+                  )
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <span
+                      className={cn(
+                        "grid size-8 place-items-center rounded-full transition-colors",
+                        isActive ? "bg-primary/15 text-primary" : "text-muted-foreground",
+                      )}
+                    >
+                      <item.icon className="size-4" />
+                    </span>
+                    {item.label}
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </div>
+        </nav>
+      )}
     </div>
   );
 }

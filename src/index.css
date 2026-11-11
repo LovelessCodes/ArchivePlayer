@@ -143,13 +143,24 @@
   html {
     @apply font-sans antialiased;
     color-scheme: dark;
+    -webkit-tap-highlight-color: transparent;
+    text-size-adjust: 100%;
   }
   body {
     @apply bg-background text-foreground;
-    min-height: 100vh;
+    min-height: 100dvh;
+  }
+  #root {
+    min-height: 100dvh;
   }
   ::selection {
     background: color-mix(in oklab, var(--primary) 45%, transparent);
+  }
+}
+
+@media (display-mode: standalone) {
+  body {
+    overscroll-behavior-y: none;
   }
 }
 

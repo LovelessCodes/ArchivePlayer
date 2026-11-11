@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900" width="600" height="900">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#1b0b0b"/><stop offset="1" stop-color="#080506"/></linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5"><stop stop-color="#ef4444"/><stop offset="1" stop-color="#ef4444" stop-opacity="0"/></radialGradient>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter>
+  </defs>
+  <rect width="600" height="900" fill="url(#bg)"/>
+  <rect width="600" height="900" fill="url(#glow)" opacity="0.13"/>
+  <circle cx="400" cy="240" r="118" fill="#e7e5e4" opacity="0.13"/>
+  <circle cx="400" cy="240" r="118" fill="none" stroke="#fca5a5" stroke-opacity="0.25"/>
+  <path d="M0 690 Q80 640 150 690 T300 680 T450 690 T600 675 V900 H0 Z" fill="#0a0505"/>
+  <path d="M120 690 V560 M170 690 V520 M500 690 V600 M545 690 V550" stroke="#ef4444" stroke-width="5" opacity="0.55"/>
+  <rect x="28" y="28" width="544" height="844" rx="10" fill="none" stroke="#ffffff" stroke-opacity="0.14"/>
+  <text x="56" y="92" fill="#ef4444" font-family="Geist, Helvetica, Arial, sans-serif" font-size="17" letter-spacing="5">PUBLIC DOMAIN</text>
+  <text x="56" y="118" fill="#ffffff" fill-opacity="0.45" font-family="Geist, Helvetica, Arial, sans-serif" font-size="15" letter-spacing="3">1968</text>
+  <text x="56" y="600" fill="#f8fafc" font-family="Geist, Helvetica, Arial, sans-serif" font-size="58" font-weight="700" letter-spacing="1">NIGHT OF THE</text>
+  <text x="56" y="662" fill="#f8fafc" font-family="Geist, Helvetica, Arial, sans-serif" font-size="58" font-weight="700" letter-spacing="1">LIVING DEAD</text>
+  <text x="58" y="746" fill="#ffffff" fill-opacity="0.58" font-family="Geist, Helvetica, Arial, sans-serif" font-size="18" letter-spacing="4">GEORGE A. ROMERO</text>
+  <rect x="56" y="786" width="64" height="4" fill="#ef4444"/>
+  <rect width="600" height="900" filter="url(#grain)" opacity="0.05"/>
+</svg>

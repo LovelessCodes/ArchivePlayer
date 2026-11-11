@@ -12,9 +12,9 @@ import { LibraryCard } from "@/features/library/library-card";
 
 function RowSkeleton() {
   return (
-    <div className="flex flex-wrap gap-4">
+    <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:flex sm:flex-wrap sm:gap-4">
       {Array.from({ length: 5 }).map((_, index) => (
-        <div key={index} className="w-[150px] shrink-0 space-y-2 sm:w-[160px] xl:w-[168px]">
+        <div key={index} className="w-full space-y-2 sm:w-[160px] xl:w-[168px]">
           <Skeleton className="aspect-[2/3] w-full rounded-xl" />
           <Skeleton className="h-3 w-4/5" />
           <Skeleton className="h-2.5 w-2/5" />
@@ -108,13 +108,13 @@ export function HomePage() {
                   {continueWatching.data.length} in progress
                 </p>
               </div>
-              <div className="flex flex-wrap gap-4">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:flex sm:flex-wrap sm:gap-4">
                 {continueWatching.data.map((item) => (
                   <LibraryCard
                     key={`continue-${item.id}`}
                     item={item}
                     showProgress
-                    className="w-[150px] shrink-0 sm:w-[160px] xl:w-[168px]"
+                    className="w-full sm:w-[160px] xl:w-[168px]"
                   />
                 ))}
               </div>
@@ -138,12 +138,12 @@ export function HomePage() {
                   </span>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-4">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:flex sm:flex-wrap sm:gap-4">
                 {category.items.map((item) => (
                   <LibraryCard
                     key={item.id}
                     item={item}
-                    className="w-[150px] shrink-0 sm:w-[160px] xl:w-[168px]"
+                    className="w-full sm:w-[160px] xl:w-[168px]"
                   />
                 ))}
               </div>

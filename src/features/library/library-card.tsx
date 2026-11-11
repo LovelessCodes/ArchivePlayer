@@ -125,14 +125,14 @@ export function LibraryCard({
           </div>
         </Link>
 
-        <div className="absolute right-2 top-2 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+        <div className="absolute right-2 top-2 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
                 <Button
                   variant="secondary"
                   size="icon-xs"
-                  className="rounded-full bg-black/75 text-white shadow-lg backdrop-blur hover:bg-black"
+                  className="size-8 rounded-full bg-black/75 text-white shadow-lg backdrop-blur hover:bg-black sm:size-6"
                   aria-label={`Actions for ${item.title}`}
                 >
                   <MoreVertical />

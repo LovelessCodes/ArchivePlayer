@@ -78,6 +78,7 @@ export function WatchPage() {
   const lastSaveRef = useRef(0);
   const hudTimerRef = useRef<number | null>(null);
   const lastTapRef = useRef(0);
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
 
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [seasonFilter, setSeasonFilter] = useState("all");
@@ -358,6 +359,7 @@ export function WatchPage() {
   }
 
   function handleDoubleClick(event: ReactMouseEvent<HTMLDivElement>) {
+    if (window.matchMedia("(pointer: coarse)").matches) return;
     const target = event.target as HTMLElement;
     if (target.closest("button, select, input, [role='dialog']")) return;
     const rect = event.currentTarget.getBoundingClientRect();
@@ -368,12 +370,32 @@ export function WatchPage() {
     else if (x > rect.width * 0.65) seekBy(10);
   }
 
+  function handleTouchStart(event: ReactTouchEvent<HTMLDivElement>) {
+    const touch = event.touches[0];
+    if (!touch) return;
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
+  }
+
   function handleTouchEnd(event: ReactTouchEvent<HTMLDivElement>) {
     const target = event.target as HTMLElement;
     if (target.closest("button, select, input")) return;
+    const start = touchStartRef.current;
+    const touch = event.changedTouches[0];
     const now = Date.now();
+    touchStartRef.current = null;
+
+    // A swipe is a scroll or a browser gesture, not a double-tap seek.
+    if (
+      !start ||
+      !touch ||
+      now - start.time > 350 ||
+      Math.hypot(touch.clientX - start.x, touch.clientY - start.y) > 12
+    ) {
+      lastTapRef.current = 0;
+      return;
+    }
+
     if (now - lastTapRef.current < 300) {
-      const touch = event.changedTouches[0];
       const rect = event.currentTarget.getBoundingClientRect();
       const x = touch.clientX - rect.left;
       if (x < rect.width * 0.4) seekBy(-10);
@@ -465,8 +487,9 @@ export function WatchPage() {
         <div className="min-w-0">
           <div
             ref={containerRef}
-            className="group/player relative overflow-hidden rounded-2xl bg-black ring-1 ring-white/10"
+            className="group/player relative overflow-hidden rounded-xl bg-black ring-1 ring-white/10 sm:rounded-2xl"
             onDoubleClick={handleDoubleClick}
+            onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           >
             {currentUrl ? (
@@ -542,8 +565,8 @@ export function WatchPage() {
               </div>
             )}
 
-            <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-3 bg-gradient-to-b from-black/80 via-black/30 to-transparent p-3">
-              <div className="min-w-0 rounded-lg bg-black/45 px-2.5 py-1.5 backdrop-blur-sm">
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-2 bg-gradient-to-b from-black/80 via-black/30 to-transparent p-2 sm:gap-3 sm:p-3">
+              <div className="min-w-0 flex-1 rounded-lg bg-black/45 px-2.5 py-1.5 backdrop-blur-sm">
                 <p className="truncate text-xs font-medium text-white">{currentTitle}</p>
                 {isTv && currentEpisode && (
                   <p className="mt-0.5 truncate text-[0.65rem] text-white/65">
@@ -557,7 +580,7 @@ export function WatchPage() {
                 )}
               </div>
 
-              <div className="pointer-events-auto flex items-center gap-1.5">
+              <div className="pointer-events-auto flex shrink-0 items-center gap-1.5">
                 <Select
                   value={String(speed)}
                   onValueChange={(value) => {
@@ -606,7 +629,7 @@ export function WatchPage() {
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  className="rounded-lg text-white hover:bg-white/15 hover:text-white"
+                  className="hidden rounded-lg text-white hover:bg-white/15 hover:text-white sm:inline-flex"
                   onClick={() => void togglePictureInPicture()}
                   aria-label="Picture in picture"
                 >
@@ -755,7 +778,7 @@ export function WatchPage() {
           )}
 
           {!showEpisodeList && (
-            <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="mt-4 hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
               <Gauge className="size-3.5" />
               <span>
                 Keyboard: Space play/pause · ←/→ skip 10s · M mute · F fullscreen
@@ -904,7 +927,7 @@ export function WatchPage() {
             </div>
 
             {previousEpisode && (
-              <p className="mt-2 px-1 text-[0.7rem] text-muted-foreground">
+              <p className="mt-2 hidden px-1 text-[0.7rem] text-muted-foreground sm:block">
                 P / N keys move between episodes
               </p>
             )}
@@ -955,7 +978,7 @@ export function WatchPage() {
                 </div>
               </dl>
 
-              <div className="mt-4 flex items-center gap-2 rounded-lg border border-border/60 bg-background/40 px-2.5 py-2 text-[0.7rem] text-muted-foreground">
+              <div className="mt-4 hidden items-center gap-2 rounded-lg border border-border/60 bg-background/40 px-2.5 py-2 text-[0.7rem] text-muted-foreground sm:flex">
                 <Volume2 className="size-3.5 shrink-0" />
                 <span>Space play/pause · arrows skip · F fullscreen</span>
               </div>

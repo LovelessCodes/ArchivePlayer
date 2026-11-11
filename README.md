@@ -1,5 +1,11 @@
 # ArchivePlayer
 
+<p>
+  <a href="https://github.com/LovelessCodes/ArchivePlayer/actions/workflows/ci.yml"><img src="https://github.com/LovelessCodes/ArchivePlayer/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/LovelessCodes/ArchivePlayer/actions/workflows/release.yml"><img src="https://github.com/LovelessCodes/ArchivePlayer/actions/workflows/release.yml/badge.svg" alt="Release" /></a>
+  <a href="https://github.com/LovelessCodes/ArchivePlayer/actions/workflows/docker.yml"><img src="https://github.com/LovelessCodes/ArchivePlayer/actions/workflows/docker.yml/badge.svg" alt="Docker image" /></a>
+</p>
+
 A local-first media library for public-domain films and shows from
 [Archive.org](https://archive.org). Browse and search the Internet Archive, build
 your own shelves, and stream directly from their servers — while your catalog and
@@ -10,6 +16,7 @@ ArchivePlayer runs in two shapes from the same Rust core:
 - **Desktop** — a native Tauri app for Windows, macOS, and Linux.
 - **Self-hosted** — a small Axum web server and Docker image. Put it on a home
   server, NAS, or VPS and reach your library from any browser on your network.
+  The web build is also an installable PWA.
 
 This is a ground-up **Rust** rewrite of
 [ArchivePlayer by Jeppe Kjeldal](https://github.com/JeppeKjeldal/ArchivePlayer),
@@ -22,6 +29,15 @@ on the [Releases](https://github.com/LovelessCodes/ArchivePlayer/releases) page.
 > The original author is credited in the app's Settings → About screen and in the
 > [LICENSE](LICENSE) file. The concept, feature set, and product design are based
 > on that project.
+
+![ArchivePlayer library on desktop](docs/screenshots/desktop-library.webp)
+
+<p align="center">
+  <img src="docs/screenshots/mobile-library.webp" alt="ArchivePlayer library on a phone" width="250" />
+  <img src="docs/screenshots/mobile-discover.webp" alt="Searching Archive.org on a phone" width="250" />
+</p>
+
+<p align="center"><sub>Screenshots use the built-in browser demo and local sample posters.</sub></p>
 
 ## Features
 
@@ -42,6 +58,8 @@ on the [Releases](https://github.com/LovelessCodes/ArchivePlayer/releases) page.
 - **Clear watch history** or remove individual titles at any time.
 - A dark, responsive UI built with React 19, Tailwind CSS v4, and shadcn/ui
   components on [Base UI](https://base-ui.com/).
+- **Installable PWA** with an offline app shell, safe-area-aware mobile layout,
+  touch-friendly controls, and a bottom navigation bar.
 
 ## Tech stack
 
@@ -114,6 +132,20 @@ To reach it from other devices, put a TLS reverse proxy (Caddy, nginx, Traefik)
 in front of it and change the port mapping to `"8080:8080"` only on a trusted
 network. Set `ARCHIVEPLAYER_SECURE_COOKIES=true` when the public URL is HTTPS.
 
+#### Install it as an app
+
+When the server is served over HTTPS (or `localhost`), open it in a browser and
+use **Install app** / **Add to Home Screen**. On iOS, use Share → Add to Home
+Screen. The installed app gets its own window and caches the application shell,
+so it opens instantly and shows a branded offline page without a connection.
+The catalog and Archive.org streams still need the server and the network; they
+are deliberately never cached. Settings → **Install as an app** offers the
+browser prompt where available and shows the right instructions elsewhere.
+
+Service workers require a secure context. A server reached over plain HTTP at a
+LAN address will work in the browser but cannot be installed as a PWA; put it
+behind TLS first.
+
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `ARCHIVEPLAYER_BIND` | `127.0.0.1:8080` (Docker: `0.0.0.0:8080`) | Listen address. |
@@ -157,6 +189,17 @@ cargo test --workspace     # Rust unit tests
 cargo clippy --workspace --all-targets
 ```
 
+Regenerate the committed README screenshots (browser mock backend):
+
+```bash
+pnpm exec playwright install chromium
+pnpm screenshots
+```
+
+Screenshots are written to `docs/screenshots/` as WebP. The mock backend uses
+local demo posters from `public/demo/`, so generation does not depend on
+Archive.org. Set `SCREENSHOT_BASE_URL` to reuse a running Vite dev server.
+
 ### Build installers
 
 ```bash
@@ -172,8 +215,8 @@ binary is built with `cargo build --release -p archiveplayer-server`.
 Releases are built by GitHub Actions when a version tag is pushed:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.3.0
+git push origin v0.3.0
 ```
 
 The tag must match the version in `package.json`, `src-tauri/tauri.conf.json`,

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900" width="600" height="900">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#180a0c"/><stop offset="1" stop-color="#050304"/></linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5"><stop stop-color="#dc2626"/><stop offset="1" stop-color="#dc2626" stop-opacity="0"/></radialGradient>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter>
+  </defs>
+  <rect width="600" height="900" fill="url(#bg)"/>
+  <rect width="600" height="900" fill="url(#glow)" opacity="0.13"/>
+  <path d="M300 110 L390 400 L300 340 L210 400 Z" fill="#dc2626" opacity="0.22"/>
+  <circle cx="300" cy="240" r="160" fill="none" stroke="#fecaca" stroke-opacity="0.14"/>
+  <path d="M140 570 Q210 460 300 500 T460 570" fill="none" stroke="#fecaca" stroke-opacity="0.16" stroke-width="3"/>
+  <path d="M100 620 L500 620" stroke="#dc2626" stroke-opacity="0.25"/>
+  <rect x="28" y="28" width="544" height="844" rx="10" fill="none" stroke="#ffffff" stroke-opacity="0.14"/>
+  <text x="56" y="92" fill="#dc2626" font-family="Geist, Helvetica, Arial, sans-serif" font-size="17" letter-spacing="5">SILENT HORROR</text>
+  <text x="56" y="118" fill="#ffffff" fill-opacity="0.45" font-family="Geist, Helvetica, Arial, sans-serif" font-size="15" letter-spacing="3">1922</text>
+  <text x="56" y="600" fill="#f8fafc" font-family="Geist, Helvetica, Arial, sans-serif" font-size="58" font-weight="700" letter-spacing="1">NOSFERATU</text>
+  <text x="58" y="684" fill="#ffffff" fill-opacity="0.58" font-family="Geist, Helvetica, Arial, sans-serif" font-size="18" letter-spacing="4">A SYMPHONY OF TERROR</text>
+  <rect x="56" y="724" width="64" height="4" fill="#dc2626"/>
+  <rect width="600" height="900" filter="url(#grain)" opacity="0.05"/>
+</svg>

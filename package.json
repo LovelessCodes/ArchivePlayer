@@ -1,7 +1,7 @@
 {
   "name": "archiveplayer",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "check": "tsc -b",
+    "screenshots": "node scripts/screenshots.mjs",
     "server": "cargo run -p archiveplayer-server --release",
     "tauri": "tauri"
   },
@@ -36,6 +37,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "oxlint": "^1.90.0",
+    "playwright": "^1.65.0",
     "typescript": "~7.0.2",
     "vite": "^8.3.6"
   },

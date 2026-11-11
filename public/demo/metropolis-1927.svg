@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900" width="600" height="900">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0a1826"/><stop offset="1" stop-color="#07080d"/></linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5"><stop stop-color="#facc15"/><stop offset="1" stop-color="#facc15" stop-opacity="0"/></radialGradient>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter>
+  </defs>
+  <rect width="600" height="900" fill="url(#bg)"/>
+  <rect width="600" height="900" fill="url(#glow)" opacity="0.13"/>
+  <path d="M150 620 V420 H190 V620 M210 620 V360 H250 V620 M270 620 V300 H310 V620 M330 620 V380 H370 V620 M390 620 V450 H430 V620" stroke="#38bdf8" stroke-opacity="0.5" stroke-width="4"/>
+  <path d="M130 620 H470" stroke="#facc15" stroke-opacity="0.55" stroke-width="3"/>
+  <circle cx="400" cy="210" r="74" fill="#facc15" opacity="0.22"/>
+  <circle cx="400" cy="210" r="74" fill="none" stroke="#facc15" stroke-opacity="0.45"/>
+  <rect x="28" y="28" width="544" height="844" rx="10" fill="none" stroke="#ffffff" stroke-opacity="0.14"/>
+  <text x="56" y="92" fill="#facc15" font-family="Geist, Helvetica, Arial, sans-serif" font-size="17" letter-spacing="5">SCIENCE FICTION</text>
+  <text x="56" y="118" fill="#ffffff" fill-opacity="0.45" font-family="Geist, Helvetica, Arial, sans-serif" font-size="15" letter-spacing="3">1927</text>
+  <text x="56" y="600" fill="#f8fafc" font-family="Geist, Helvetica, Arial, sans-serif" font-size="58" font-weight="700" letter-spacing="1">METROPOLIS</text>
+  <text x="58" y="684" fill="#ffffff" fill-opacity="0.58" font-family="Geist, Helvetica, Arial, sans-serif" font-size="18" letter-spacing="4">FRITZ LANG</text>
+  <rect x="56" y="724" width="64" height="4" fill="#facc15"/>
+  <rect width="600" height="900" filter="url(#grain)" opacity="0.05"/>
+</svg>

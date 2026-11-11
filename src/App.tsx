@@ -16,7 +16,7 @@ import { queryClient } from "@/lib/query";
 
 function NotFoundPage() {
   return (
-    <div className="app-background grid min-h-screen place-items-center px-4">
+    <div className="app-background grid min-h-dvh place-items-center px-4">
       <div className="text-center">
         <Logo className="justify-center" />
         <p className="mt-6 font-heading text-5xl font-semibold tracking-tight">404</p>

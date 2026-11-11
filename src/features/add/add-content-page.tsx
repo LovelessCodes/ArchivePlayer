@@ -152,13 +152,13 @@ export function AddContentPage() {
                 onChange={(event) => setQueryInput(event.target.value)}
                 placeholder="Search Archive.org — e.g. night of the living dead"
                 className="h-11 rounded-xl pl-9"
-                autoFocus
+                enterKeyHint="search"
               />
             </div>
             <Button
               type="submit"
               size="lg"
-              className="h-11 rounded-xl px-5"
+              className="h-11 w-full rounded-xl px-5 sm:w-auto"
               disabled={search.isFetching && !search.isFetchingNextPage}
             >
               {search.isFetching && !search.isFetchingNextPage ? (

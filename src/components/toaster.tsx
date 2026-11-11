@@ -5,6 +5,10 @@ export function Toaster() {
     <Sonner
       theme="dark"
       position="bottom-right"
+      mobileOffset={{
+        right: 16,
+        bottom: "calc(4.75rem + env(safe-area-inset-bottom))",
+      }}
       closeButton
       richColors
       toastOptions={{

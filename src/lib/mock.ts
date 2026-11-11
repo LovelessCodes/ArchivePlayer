@@ -26,7 +26,20 @@ type MockState = {
 
 const STORAGE_KEY = "archiveplayer.mock.v1";
 const now = () => new Date().toISOString();
-const poster = (identifier: string) => `https://archive.org/services/img/${identifier}`;
+
+const DEMO_POSTERS: Record<string, string> = {
+  BigBuckBunny_124: "/demo/big-buck-bunny.svg",
+  night_of_the_living_dead: "/demo/night-of-the-living-dead.svg",
+  plan_9_from_outer_space_1959: "/demo/plan-9-from-outer-space.svg",
+  the_general_1926: "/demo/the-general-1926.svg",
+  the_twilight_zone: "/demo/the-twilight-zone.svg",
+  nosferatu_1922: "/demo/nosferatu-1922.svg",
+  metropolis_1927: "/demo/metropolis-1927.svg",
+  sherlock_holmes_1954: "/demo/sherlock-holmes.svg",
+};
+
+const poster = (identifier: string) =>
+  DEMO_POSTERS[identifier] ?? `https://archive.org/services/img/${identifier}`;
 const SAMPLE_VIDEO =
   "https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4";
 
@@ -54,10 +67,10 @@ const seedLibrary = (): LibraryItem[] => [
     thumbnailUrl: poster("night_of_the_living_dead"),
     tmdbPosterUrl: null,
     categoryName: "Movies",
-    watchProgressSeconds: 0,
-    durationSeconds: 0,
-    currentEpisodeFileName: null,
-    lastWatched: null,
+    watchProgressSeconds: 840,
+    durationSeconds: 5760,
+    currentEpisodeFileName: "night-of-the-living-dead.mp4",
+    lastWatched: now(),
     isCompleted: false,
     addedAt: now(),
   },
@@ -84,10 +97,10 @@ const seedLibrary = (): LibraryItem[] => [
     thumbnailUrl: poster("the_general_1926"),
     tmdbPosterUrl: null,
     categoryName: "Silent Era",
-    watchProgressSeconds: 0,
-    durationSeconds: 0,
-    currentEpisodeFileName: null,
-    lastWatched: null,
+    watchProgressSeconds: 1320,
+    durationSeconds: 4500,
+    currentEpisodeFileName: "the-general.mp4",
+    lastWatched: now(),
     isCompleted: false,
     addedAt: now(),
   },
@@ -222,6 +235,12 @@ function playableEpisodes(item: LibraryItem): Episode[] {
       fileName: `The.Twilight.Zone.S01E0${index + 1}.mp4`,
     }));
   }
+  const movieFiles: Record<string, string> = {
+    BigBuckBunny_124: "Content/big_buck_bunny_720p_surround.mp4",
+    night_of_the_living_dead: "night-of-the-living-dead.mp4",
+    plan_9_from_outer_space_1959: "plan-9.mp4",
+    the_general_1926: "the-general.mp4",
+  };
   return [
     {
       seasonNumber: null,
@@ -229,7 +248,7 @@ function playableEpisodes(item: LibraryItem): Episode[] {
       name: item.title,
       overview: null,
       stillUrl: null,
-      fileName: item.identifier === "plan_9_from_outer_space_1959" ? "plan-9.mp4" : "sample.mp4",
+      fileName: movieFiles[item.identifier] ?? "sample.mp4",
     },
   ];
 }
@@ -504,7 +523,7 @@ export async function mockInvoke<T>(command: string, args?: Record<string, unkno
           dataDir: "~/Library/Application Support/ArchivePlayer (demo)",
           settingsPath: "~/Library/Application Support/ArchivePlayer/settings.json",
           databasePath: "~/Library/Application Support/ArchivePlayer/archiveplayer.db",
-          appVersion: "0.1.0 (browser demo)",
+          appVersion: "0.3.0 (browser demo)",
           canManageSettings: true,
           runtime: "server",
         };
@@ -527,7 +546,7 @@ export async function mockInvoke<T>(command: string, args?: Record<string, unkno
       case "get_app_info":
         requireUser();
         return {
-          version: "0.1.0 (browser demo)",
+          version: "0.3.0 (browser demo)",
           dataDir: "~/Library/Application Support/ArchivePlayer (demo)",
           settingsPath: "~/Library/Application Support/ArchivePlayer/settings.json",
           databasePath: "~/Library/Application Support/ArchivePlayer/archiveplayer.db",

@@ -8,11 +8,12 @@ use archiveplayer_core::models::{
 };
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderValue, StatusCode, header};
 use axum::routing::{delete, get, patch, post, put};
 use axum::{Json, Router};
 use axum_extra::extract::cookie::CookieJar;
 use serde::{Deserialize, Serialize};
+use tower_http::set_header::SetResponseHeaderLayer;
 
 pub fn api_router(state: SharedState) -> Router {
     Router::new()
@@ -40,6 +41,10 @@ pub fn api_router(state: SharedState) -> Router {
         .route("/app-info", get(get_app_info))
         .fallback(api_not_found)
         .with_state(state)
+        .layer(SetResponseHeaderLayer::overriding(
+            header::CACHE_CONTROL,
+            HeaderValue::from_static("no-store"),
+        ))
 }
 
 async fn api_not_found() -> ApiError {

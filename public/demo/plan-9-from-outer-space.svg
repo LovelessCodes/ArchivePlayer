@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900" width="600" height="900">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0b2030"/><stop offset="1" stop-color="#0a0718"/></linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5"><stop stop-color="#22d3ee"/><stop offset="1" stop-color="#22d3ee" stop-opacity="0"/></radialGradient>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter>
+  </defs>
+  <rect width="600" height="900" fill="url(#bg)"/>
+  <rect width="600" height="900" fill="url(#glow)" opacity="0.13"/>
+  <circle cx="300" cy="270" r="190" fill="none" stroke="#22d3ee" stroke-opacity="0.18"/>
+  <circle cx="300" cy="270" r="130" fill="none" stroke="#a78bfa" stroke-opacity="0.22"/>
+  <ellipse cx="300" cy="255" rx="150" ry="34" fill="none" stroke="#22d3ee" stroke-width="3" opacity="0.55"/>
+  <ellipse cx="300" cy="255" rx="150" ry="34" fill="#22d3ee" opacity="0.08"/>
+  <circle cx="300" cy="255" r="30" fill="#a78bfa" opacity="0.7"/>
+  <rect x="28" y="28" width="544" height="844" rx="10" fill="none" stroke="#ffffff" stroke-opacity="0.14"/>
+  <text x="56" y="92" fill="#22d3ee" font-family="Geist, Helvetica, Arial, sans-serif" font-size="17" letter-spacing="5">CULT CLASSIC</text>
+  <text x="56" y="118" fill="#ffffff" fill-opacity="0.45" font-family="Geist, Helvetica, Arial, sans-serif" font-size="15" letter-spacing="3">1959</text>
+  <text x="56" y="600" fill="#f8fafc" font-family="Geist, Helvetica, Arial, sans-serif" font-size="58" font-weight="700" letter-spacing="1">PLAN 9</text>
+  <text x="56" y="662" fill="#f8fafc" font-family="Geist, Helvetica, Arial, sans-serif" font-size="58" font-weight="700" letter-spacing="1">FROM OUTER</text>
+  <text x="56" y="724" fill="#f8fafc" font-family="Geist, Helvetica, Arial, sans-serif" font-size="58" font-weight="700" letter-spacing="1">SPACE</text>
+  <text x="58" y="808" fill="#ffffff" fill-opacity="0.58" font-family="Geist, Helvetica, Arial, sans-serif" font-size="18" letter-spacing="4">ED WOOD</text>
+  <rect x="56" y="848" width="64" height="4" fill="#22d3ee"/>
+  <rect width="600" height="900" filter="url(#grain)" opacity="0.05"/>
+</svg>

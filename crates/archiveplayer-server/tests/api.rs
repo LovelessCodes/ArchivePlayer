@@ -23,6 +23,8 @@ fn test_app() -> TestApp {
         "<!doctype html><title>ArchivePlayer test</title>",
     )
     .unwrap();
+    std::fs::create_dir_all(static_dir.join("assets")).unwrap();
+    std::fs::write(static_dir.join("assets/app-abc123.js"), "console.log(1);").unwrap();
 
     let config = Config {
         bind: "127.0.0.1:0".parse().unwrap(),
@@ -108,6 +110,15 @@ async fn health_is_public() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response
+            .headers()
+            .get(header::CACHE_CONTROL)
+            .unwrap()
+            .to_str()
+            .unwrap(),
+        "no-store"
+    );
     let body = body_json(response).await;
     assert_eq!(body["status"], "ok");
 }
@@ -216,6 +227,15 @@ async fn serves_spa_and_json_404() {
             .unwrap()
             .contains("default-src 'self'")
     );
+    assert_eq!(
+        response
+            .headers()
+            .get(header::CACHE_CONTROL)
+            .unwrap()
+            .to_str()
+            .unwrap(),
+        "no-cache"
+    );
     let body = response.into_body().collect().await.unwrap().to_bytes();
     assert!(String::from_utf8_lossy(&body).contains("ArchivePlayer test"));
 
@@ -246,5 +266,26 @@ async fn first_user_owns_server_settings() {
     assert_eq!(
         body["dataDir"],
         app.state.service.data_dir.display().to_string()
+    );
+}
+
+#[tokio::test]
+async fn hashed_assets_are_cached_forever() {
+    let app = test_app();
+    let response = app
+        .router
+        .clone()
+        .oneshot(request("GET", "/assets/app-abc123.js", None, None))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response
+            .headers()
+            .get(header::CACHE_CONTROL)
+            .unwrap()
+            .to_str()
+            .unwrap(),
+        "public, max-age=31536000, immutable"
     );
 }

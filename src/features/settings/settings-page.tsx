@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   Check,
   Database,
+  Download,
   ExternalLink,
   Eye,
   EyeOff,
@@ -11,6 +12,7 @@ import {
   Loader2,
   Server,
   ShieldCheck,
+  Smartphone,
   Sparkles,
   Trash2,
 } from "lucide-react";
@@ -24,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { usePwaInstall } from "@/hooks/use-pwa-install";
 import { api, errorMessage } from "@/lib/api";
 import { openExternal } from "@/lib/links";
 import { queryKeys } from "@/lib/query";
@@ -44,6 +47,7 @@ export function SettingsPage() {
   const [confirmClear, setConfirmClear] = useState(false);
 
   const settings = useQuery({ queryKey: queryKeys.settings, queryFn: api.getSettings });
+  const pwa = usePwaInstall();
 
   const saveKey = useMutation({
     mutationFn: () => api.saveTmdbKey(apiKey.trim()),
@@ -274,6 +278,43 @@ export function SettingsPage() {
                 : "Closing the app signs you out. Your library is kept for the next launch."}
             </div>
           </section>
+
+          {!pwa.desktopShell && !pwa.standalone && (
+            <section className="rounded-2xl border border-border/60 bg-card/40">
+              <div className="flex gap-3 border-b border-border/60 px-5 py-4">
+                <div className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg border border-border/70 bg-background/50 text-primary">
+                  <Smartphone className="size-4" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-semibold">Install as an app</h2>
+                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                    Open ArchivePlayer in its own window, with the app shell available offline.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  {pwa.canInstall
+                    ? "Add ArchivePlayer to this device. Your library still lives on the server."
+                    : pwa.ios
+                      ? "On iPhone or iPad, open Share and choose Add to Home Screen. The server must use HTTPS."
+                      : "Open this server in Chrome or Edge over HTTPS, then choose Install app from the browser menu."}
+                </p>
+                {pwa.canInstall && (
+                  <Button
+                    className="shrink-0"
+                    onClick={async () => {
+                      const accepted = await pwa.install();
+                      if (accepted) toast.success("ArchivePlayer installed.");
+                    }}
+                  >
+                    <Download data-icon="inline-start" />
+                    Install app
+                  </Button>
+                )}
+              </div>
+            </section>
+          )}
 
           <section className="rounded-2xl border border-border/60 bg-card/40">
             <div className="flex gap-3 border-b border-border/60 px-5 py-4">

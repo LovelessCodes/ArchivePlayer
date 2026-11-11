@@ -1,6 +1,6 @@
 [package]
 name = "archiveplayer"
-version = "0.2.0"
+version = "0.3.0"
 description = "A local-first media library for Archive.org"
 authors = ["Jeppe Kjeldal and ArchivePlayer contributors"]
 license = "MIT"
