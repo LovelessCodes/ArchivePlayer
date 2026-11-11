@@ -21,4 +21,5 @@ export const queryKeys = {
   search: (query: string) => ["archive-search", query] as const,
   suggestions: (identifier: string) => ["category-suggestions", identifier] as const,
   settings: ["settings"] as const,
+  devices: ["devices"] as const,
 };

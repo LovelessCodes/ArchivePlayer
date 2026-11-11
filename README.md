@@ -53,6 +53,8 @@ on the [Releases](https://github.com/LovelessCodes/ArchivePlayer/releases) page.
 - **Filename-based episode detection** when TMDB is not configured.
 - **Profiles** with Argon2 password hashing. Desktop keeps the session in memory;
   server mode uses random, hashed session cookies.
+- **TV and native client pairing** with a ten-minute device code, explicit
+  per-device permissions, and revocable bearer tokens.
 - **SQLite catalog** — no account service, telemetry, or cloud dependency. Keep it
   desktop-only, or run the server and share it with your devices.
 - **Clear watch history** or remove individual titles at any time.
@@ -146,6 +148,22 @@ Service workers require a secure context. A server reached over plain HTTP at a
 LAN address will work in the browser but cannot be installed as a PWA; put it
 behind TLS first.
 
+#### Pair a TV or native client
+
+The server implements an OAuth-style device authorization flow, so a TV never
+asks for your password. Open **Settings → Connected devices** in a signed-in
+browser, then enter the eight-character code shown on the TV. The activation page
+is at `/#/activate`; a QR code can point directly to
+`/#/activate?code=ABCD-EFGH`.
+
+Each paired device receives an opaque bearer token with explicit scopes
+(`library:read`, `library:write`, `progress:write`) and can be revoked instantly.
+Tokens are stored only as SHA-256 hashes. See
+[docs/tv-clients.md](docs/tv-clients.md) for the endpoint contract and client
+notes; pair over HTTPS before exposing the server outside your network.
+
+![Approving a TV from the browser](docs/screenshots/desktop-activate.webp)
+
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `ARCHIVEPLAYER_BIND` | `127.0.0.1:8080` (Docker: `0.0.0.0:8080`) | Listen address. |
@@ -153,7 +171,10 @@ behind TLS first.
 | `ARCHIVEPLAYER_STATIC_DIR` | `dist` (`/app/dist` in Docker) | Built frontend files. |
 | `ARCHIVEPLAYER_ALLOW_REGISTRATION` | `false` | Allow anyone to create an account after the owner. |
 | `ARCHIVEPLAYER_SECURE_COOKIES` | `false` | Mark session cookies `Secure`; enable behind HTTPS. |
-| `ARCHIVEPLAYER_SESSION_DAYS` | `30` | Session lifetime, clamped to 1–365 days. |
+| `ARCHIVEPLAYER_SESSION_DAYS` | `30` | Browser session lifetime, clamped to 1–365 days. |
+| `ARCHIVEPLAYER_DEVICE_SESSION_DAYS` | `180` | Paired-device token lifetime, clamped to 1–3650 days. |
+| `ARCHIVEPLAYER_PUBLIC_URL` | unset | Public base URL used in pairing links, e.g. `https://media.example.com`. |
+| `ARCHIVEPLAYER_CORS_ORIGINS` | unset | Comma-separated browser origins allowed to call the API (webOS/TV wrappers). Native apps do not need it. |
 
 Back up the volume before upgrades:
 
@@ -215,8 +236,8 @@ binary is built with `cargo build --release -p archiveplayer-server`.
 Releases are built by GitHub Actions when a version tag is pushed:
 
 ```bash
-git tag v0.3.0
-git push origin v0.3.0
+git tag v0.4.0
+git push origin v0.4.0
 ```
 
 The tag must match the version in `package.json`, `src-tauri/tauri.conf.json`,
@@ -246,9 +267,12 @@ In server mode the same SQLite catalog is stored in `ARCHIVEPLAYER_DATA_DIR`:
   permissions on Unix).
 
 The first registered account is the owner and the only account that can change
-the TMDB key. Sessions are random 32-byte tokens stored only as SHA-256 hashes,
-sent in an `HttpOnly`, `SameSite=Lax` cookie. Expired sessions are cleaned up
-when someone signs in or registers.
+the TMDB key. Browser sessions are random 32-byte tokens stored only as SHA-256
+hashes, sent in an `HttpOnly`, `SameSite=Lax` cookie. Paired devices use the same
+session table with an opaque `Authorization: Bearer ...` token, a label, a
+platform, scopes, and a longer lifetime. Approval codes and device tokens are
+both stored hashed; expired sessions and pairing requests are cleaned up when
+someone signs in, registers, or starts a new pairing.
 
 ## How it works
 

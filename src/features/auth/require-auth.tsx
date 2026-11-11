@@ -1,6 +1,6 @@
 import { WifiOff } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { Logo } from "@/components/logo";
 import { Spinner } from "@/components/spinner";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { errorMessage } from "@/lib/api";
 
 export function RequireAuth({ children }: { children: ReactNode }) {
   const auth = useAuthQuery();
+  const location = useLocation();
   const offline = typeof navigator !== "undefined" && !navigator.onLine;
 
   const refetchRef = useRef(auth.refetch);
@@ -59,7 +60,13 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   }
 
   if (!auth.data?.currentUser) {
-    return <Navigate to="/auth" replace />;
+    return (
+      <Navigate
+        to="/auth"
+        state={{ from: `${location.pathname}${location.search}` }}
+        replace
+      />
+    );
   }
 
   return <>{children}</>;

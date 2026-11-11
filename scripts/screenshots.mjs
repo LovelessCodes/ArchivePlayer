@@ -140,7 +140,12 @@ async function desktopShots(browser) {
   await page.goto(`${base}/#/settings`, { waitUntil: "domcontentloaded" });
   await page.getByRole("heading", { name: "Settings", exact: true }).waitFor();
   await page.getByText("TMDB metadata").waitFor();
+  await page.getByText("Connected devices").waitFor();
   await capture(page, "desktop-settings");
+
+  await page.goto(`${base}/#/activate?code=ABCD-EFGH`, { waitUntil: "domcontentloaded" });
+  await page.getByText("Living room TV").waitFor();
+  await capture(page, "desktop-activate");
 
   await context.close();
 }

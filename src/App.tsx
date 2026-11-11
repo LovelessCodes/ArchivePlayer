@@ -9,6 +9,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AddContentPage } from "@/features/add/add-content-page";
 import { AuthPage } from "@/features/auth/auth-page";
 import { RequireAuth } from "@/features/auth/require-auth";
+import { ActivatePage } from "@/features/devices/activate-page";
 import { HomePage } from "@/features/library/home-page";
 import { WatchPage } from "@/features/player/watch-page";
 import { SettingsPage } from "@/features/settings/settings-page";
@@ -37,6 +38,14 @@ export default function App() {
           <HashRouter>
             <Routes>
               <Route path="/auth" element={<AuthPage />} />
+              <Route
+                path="/activate"
+                element={
+                  <RequireAuth>
+                    <ActivatePage />
+                  </RequireAuth>
+                }
+              />
               <Route
                 element={
                   <RequireAuth>

@@ -33,6 +33,9 @@ fn test_app() -> TestApp {
         secure_cookies: false,
         allow_registration: false,
         session_days: 30,
+        device_session_days: 180,
+        public_url: None,
+        cors_origins: vec![],
     };
     let service = Service::new(config.data_dir.clone()).unwrap();
     let state = app_state(service, config);
@@ -58,6 +61,15 @@ fn request(method: &str, uri: &str, body: Option<Value>, cookie: Option<&str>) -
     }
     builder
         .body(body.map_or_else(Body::empty, |value| Body::from(value.to_string())))
+        .unwrap()
+}
+
+fn bearer_request(method: &str, uri: &str, token: &str) -> Request<Body> {
+    Request::builder()
+        .method(method)
+        .uri(uri)
+        .header(header::AUTHORIZATION, format!("Bearer {token}"))
+        .body(Body::empty())
         .unwrap()
 }
 
@@ -288,4 +300,177 @@ async fn hashed_assets_are_cached_forever() {
             .unwrap(),
         "public, max-age=31536000, immutable"
     );
+}
+
+#[tokio::test]
+async fn device_pairing_grants_scoped_bearer_token() {
+    let app = test_app();
+    let (status, cookie) = register(&app, "owner@example.com").await;
+    assert_eq!(status, StatusCode::OK);
+
+    let response = app
+        .router
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/api/device/start",
+            Some(json!({
+                "clientName": "Untrusted TV",
+                "scopes": ["settings:manage"]
+            })),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(body_json(response).await["code"], "invalid");
+
+    let response = app
+        .router
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/api/device/start",
+            Some(json!({
+                "clientName": "Living room TV",
+                "platform": "webos",
+                "scopes": ["library:read", "progress:write"]
+            })),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let start = body_json(response).await;
+    let device_code = start["deviceCode"].as_str().unwrap().to_string();
+    let user_code = start["userCode"].as_str().unwrap().to_string();
+    assert_eq!(start["interval"], 5);
+
+    let response = app
+        .router
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/api/device/token",
+            Some(json!({ "deviceCode": device_code })),
+            None,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(body_json(response).await["code"], "authorization_pending");
+
+    let response = app
+        .router
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/api/device/lookup",
+            Some(json!({ "userCode": user_code })),
+            Some(&cookie),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let lookup = body_json(response).await;
+    assert_eq!(lookup["clientName"], "Living room TV");
+    assert_eq!(lookup["scopes"][0], "library:read");
+
+    let response = app
+        .router
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/api/device/approve",
+            Some(json!({ "userCode": user_code })),
+            Some(&cookie),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+
+    // The first poll after approval can either redeem immediately or be
+    // rate-limited by the interval from the pending poll above.
+    let mut token_body = Value::Null;
+    for attempt in 0..2 {
+        let response = app
+            .router
+            .clone()
+            .oneshot(request(
+                "POST",
+                "/api/device/token",
+                Some(json!({ "deviceCode": device_code })),
+                None,
+            ))
+            .await
+            .unwrap();
+        let status = response.status();
+        token_body = body_json(response).await;
+        if status == StatusCode::OK {
+            break;
+        }
+        assert_eq!(
+            (status, token_body["code"].as_str()),
+            (StatusCode::TOO_MANY_REQUESTS, Some("slow_down")),
+            "unexpected token response: {token_body}"
+        );
+        assert_eq!(attempt, 0, "still rate-limited after waiting");
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    }
+    let token = token_body["token"].as_str().unwrap().to_string();
+    assert_eq!(token.len(), 64);
+
+    let response = app
+        .router
+        .clone()
+        .oneshot(bearer_request("GET", "/api/library", &token))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let response = app
+        .router
+        .clone()
+        .oneshot(bearer_request("GET", "/api/settings", &token))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+    let response = app
+        .router
+        .clone()
+        .oneshot(request("GET", "/api/devices", None, Some(&cookie)))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let devices = body_json(response).await;
+    let device = devices
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|session| session["kind"] == "device")
+        .expect("paired device is listed");
+    assert_eq!(device["label"], "Living room TV");
+    let device_id = device["id"].as_str().unwrap().to_string();
+
+    let response = app
+        .router
+        .clone()
+        .oneshot(request(
+            "DELETE",
+            &format!("/api/devices/{device_id}"),
+            None,
+            Some(&cookie),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+
+    let response = app
+        .router
+        .clone()
+        .oneshot(bearer_request("GET", "/api/library", &token))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }

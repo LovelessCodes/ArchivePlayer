@@ -8,10 +8,14 @@ import type {
   ArchiveSearchResult,
   AuthStatus,
   CategorySuggestion,
+  DeviceLookup,
+  DeviceStartResponse,
+  DeviceTokenResponse,
   Episode,
   LibraryItem,
   LibraryResponse,
   MediaDetails,
+  Session,
   SettingsInfo,
   User,
 } from "@/lib/types";
@@ -19,6 +23,7 @@ import type {
 type MockState = {
   users: User[];
   sessionUserId: number | null;
+  sessions: Session[];
   library: LibraryItem[];
   settings: { tmdbApiKey: string | null; lastEmail: string | null };
   progress: Record<number, Record<string, { position: number; duration: number; completed: boolean }>>;
@@ -172,9 +177,37 @@ const searchCatalog: ArchiveSearchResult[] = [
   },
 ];
 
+const demoSession = (
+  id: string,
+  kind: Session["kind"],
+  label: string,
+  platform: string,
+  scopes: string[],
+): Session => {
+  const seconds = Math.floor(Date.now() / 1000);
+  return {
+    id,
+    kind,
+    label,
+    platform,
+    scopes,
+    createdAt: new Date(seconds * 1000).toISOString(),
+    lastSeenAt: seconds,
+    expiresAt: seconds + 180 * 24 * 60 * 60,
+    current: kind === "browser",
+  };
+};
+
 const initial = (): MockState => ({
   users: [],
   sessionUserId: null,
+  sessions: [
+    demoSession("browser-demo", "browser", "Chrome on this device", "web", ["*"]),
+    demoSession("tv-demo", "device", "Living room TV", "webos", [
+      "library:read",
+      "progress:write",
+    ]),
+  ],
   library: seedLibrary(),
   settings: { tmdbApiKey: null, lastEmail: null },
   progress: {},
@@ -523,7 +556,7 @@ export async function mockInvoke<T>(command: string, args?: Record<string, unkno
           dataDir: "~/Library/Application Support/ArchivePlayer (demo)",
           settingsPath: "~/Library/Application Support/ArchivePlayer/settings.json",
           databasePath: "~/Library/Application Support/ArchivePlayer/archiveplayer.db",
-          appVersion: "0.3.0 (browser demo)",
+          appVersion: "0.4.0 (browser demo)",
           canManageSettings: true,
           runtime: "server",
         };
@@ -546,12 +579,57 @@ export async function mockInvoke<T>(command: string, args?: Record<string, unkno
       case "get_app_info":
         requireUser();
         return {
-          version: "0.3.0 (browser demo)",
+          version: "0.4.0 (browser demo)",
           dataDir: "~/Library/Application Support/ArchivePlayer (demo)",
           settingsPath: "~/Library/Application Support/ArchivePlayer/settings.json",
           databasePath: "~/Library/Application Support/ArchivePlayer/archiveplayer.db",
           runtime: "server",
         };
+      case "list_devices": {
+        requireUser();
+        return state.sessions;
+      }
+      case "revoke_device": {
+        requireUser();
+        const id = String(a.id ?? "");
+        state.sessions = state.sessions.filter((session) => session.id !== id);
+        persist();
+        return undefined;
+      }
+      case "device_start": {
+        const response: DeviceStartResponse = {
+          deviceCode: "demo-device-code",
+          userCode: "ABCD-EFGH",
+          verificationUri: `${window.location.origin}/#/activate`,
+          verificationUriComplete: `${window.location.origin}/#/activate?code=ABCD-EFGH`,
+          expiresIn: 600,
+          interval: 5,
+        };
+        return response;
+      }
+      case "device_token": {
+        requireUser();
+        const response: DeviceTokenResponse = {
+          token: "demo-device-token",
+          user: requireUser(),
+          expiresAt: Math.floor(Date.now() / 1000) + 180 * 24 * 60 * 60,
+        };
+        return response;
+      }
+      case "device_lookup": {
+        requireUser();
+        const response: DeviceLookup = {
+          clientName: "Living room TV",
+          platform: "webOS",
+          scopes: ["library:read", "progress:write"],
+          status: "pending",
+          expiresIn: 540,
+        };
+        return response;
+      }
+      case "device_approve":
+        requireUser();
+        return undefined;
       case "open_external":
         window.open(String(a.url ?? ""), "_blank", "noopener,noreferrer");
         return undefined;

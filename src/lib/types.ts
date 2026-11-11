@@ -123,3 +123,40 @@ export interface AppInfo {
   databasePath: string;
   runtime: RuntimeMode;
 }
+
+export type SessionKind = "browser" | "device";
+
+export interface Session {
+  id: string;
+  kind: SessionKind;
+  label: string | null;
+  platform: string | null;
+  scopes: string[];
+  createdAt: string;
+  lastSeenAt: number | null;
+  expiresAt: number;
+  current: boolean;
+}
+
+export interface DeviceStartResponse {
+  deviceCode: string;
+  userCode: string;
+  verificationUri: string;
+  verificationUriComplete: string;
+  expiresIn: number;
+  interval: number;
+}
+
+export interface DeviceTokenResponse {
+  token: string;
+  user: User;
+  expiresAt: number;
+}
+
+export interface DeviceLookup {
+  clientName: string;
+  platform: string;
+  scopes: string[];
+  status: string;
+  expiresIn: number;
+}

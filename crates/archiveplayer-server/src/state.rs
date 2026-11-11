@@ -1,8 +1,9 @@
 use crate::config::Config;
 use crate::session;
+use archiveplayer_core::db::AuthSession;
 use archiveplayer_core::models::User;
 use archiveplayer_core::{CoreError, CoreResult, Service};
-use axum_extra::extract::cookie::CookieJar;
+use axum::http::HeaderMap;
 use chrono::Utc;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -28,16 +29,36 @@ impl AppState {
         Utc::now().timestamp()
     }
 
-    pub fn current_user(&self, jar: &CookieJar) -> CoreResult<Option<User>> {
-        let Some(cookie) = jar.get(session::COOKIE_NAME) else {
+    pub fn current_session(&self, headers: &HeaderMap) -> CoreResult<Option<AuthSession>> {
+        let Some(token) = session::request_token(headers) else {
             return Ok(None);
         };
-        let token_hash = session::hash_token(cookie.value());
-        self.service.db.session_user(&token_hash, self.now())
+        let token_hash = session::hash_token(&token);
+        let now = self.now();
+        let Some(auth) = self.service.db.session_auth(&token_hash, now)? else {
+            return Ok(None);
+        };
+        if auth
+            .session
+            .last_seen_at
+            .is_none_or(|last_seen| last_seen < now - 60)
+        {
+            self.service.db.touch_session(&token_hash, now)?;
+        }
+        Ok(Some(auth))
     }
 
-    pub fn require_user(&self, jar: &CookieJar) -> CoreResult<User> {
-        self.current_user(jar)?.ok_or(CoreError::Unauthorized)
+    pub fn current_user(&self, headers: &HeaderMap) -> CoreResult<Option<User>> {
+        Ok(self.current_session(headers)?.map(|auth| auth.user))
+    }
+
+    pub fn require_session(&self, headers: &HeaderMap) -> CoreResult<AuthSession> {
+        self.current_session(headers)?
+            .ok_or(CoreError::Unauthorized)
+    }
+
+    pub fn require_user(&self, headers: &HeaderMap) -> CoreResult<User> {
+        Ok(self.require_session(headers)?.user)
     }
 
     pub fn registration_open(&self, has_users: bool) -> bool {
@@ -50,5 +71,9 @@ impl AppState {
 
     pub fn session_expiry(&self) -> i64 {
         self.now() + self.config.session_days * 24 * 60 * 60
+    }
+
+    pub fn device_session_expiry(&self) -> i64 {
+        self.now() + self.config.device_session_days * 24 * 60 * 60
     }
 }

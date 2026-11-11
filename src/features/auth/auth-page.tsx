@@ -13,7 +13,7 @@ import {
   WifiOff,
 } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,6 +54,9 @@ export function AuthPage() {
   const auth = useAuthQuery();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const location = useLocation();
+  const previous = (location.state as { from?: string } | null)?.from;
+  const from = previous && previous !== "/auth" ? previous : "/";
   const isServer = auth.data?.runtime === "server";
   const features = featuresFor(isServer);
   const offline = typeof navigator !== "undefined" && !navigator.onLine;
@@ -97,7 +100,7 @@ export function AuthPage() {
     onSuccess: async () => {
       setFormError(null);
       await queryClient.invalidateQueries({ queryKey: queryKeys.auth });
-      navigate("/", { replace: true });
+      navigate(from, { replace: true });
     },
     onError: (error) => setFormError(errorMessage(error)),
   });
@@ -150,7 +153,7 @@ export function AuthPage() {
   }
 
   if (auth.data?.currentUser) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={from} replace />;
   }
 
   const isRegister = mode === "register";

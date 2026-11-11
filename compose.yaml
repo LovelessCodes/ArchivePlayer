@@ -12,6 +12,9 @@ services:
       ARCHIVEPLAYER_ALLOW_REGISTRATION: "false"
       ARCHIVEPLAYER_SECURE_COOKIES: "false"
       ARCHIVEPLAYER_SESSION_DAYS: "30"
+      ARCHIVEPLAYER_DEVICE_SESSION_DAYS: "180"
+      # ARCHIVEPLAYER_PUBLIC_URL: "https://media.example.com"
+      # ARCHIVEPLAYER_CORS_ORIGINS: "https://tv.example.com,null"
       RUST_LOG: "archiveplayer_server=info,tower_http=warn"
     volumes:
       - archiveplayer-data:/data

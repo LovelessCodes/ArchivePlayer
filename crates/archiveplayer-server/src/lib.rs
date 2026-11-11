@@ -1,3 +1,4 @@
+mod auth;
 pub mod config;
 mod error;
 mod routes;
@@ -9,11 +10,12 @@ pub use state::{AppState, SharedState};
 
 use axum::Router;
 use axum::extract::Request;
-use axum::http::{HeaderName, HeaderValue, header};
+use axum::http::{HeaderName, HeaderValue, Method, header};
 use axum::middleware::{self, Next};
 use axum::response::Response;
 use std::sync::Arc;
 use tower_http::compression::CompressionLayer;
+use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
@@ -49,11 +51,12 @@ async fn cache_control(request: Request, next: Next) -> Response {
 }
 
 pub fn build_router(state: SharedState) -> Router {
+    let cors_origins = state.config.cors_origins.clone();
     let index = state.config.static_dir.join("index.html");
     let static_files =
         ServeDir::new(&state.config.static_dir).not_found_service(ServeFile::new(index));
 
-    Router::new()
+    let mut router = Router::new()
         .nest("/api", routes::api_router(state))
         .fallback_service(static_files)
         .layer(middleware::from_fn(cache_control))
@@ -74,7 +77,28 @@ pub fn build_router(state: SharedState) -> Router {
             HeaderValue::from_static("strict-origin-when-cross-origin"),
         ))
         .layer(CompressionLayer::new())
-        .layer(TraceLayer::new_for_http())
+        .layer(TraceLayer::new_for_http());
+
+    if !cors_origins.is_empty() {
+        let origins: Vec<HeaderValue> = cors_origins
+            .iter()
+            .filter_map(|origin| HeaderValue::from_str(origin).ok())
+            .collect();
+        router = router.layer(
+            CorsLayer::new()
+                .allow_origin(AllowOrigin::list(origins))
+                .allow_methods([
+                    Method::GET,
+                    Method::POST,
+                    Method::PUT,
+                    Method::PATCH,
+                    Method::DELETE,
+                ])
+                .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]),
+        );
+    }
+
+    router
 }
 
 pub fn app_state(service: archiveplayer_core::Service, config: Config) -> SharedState {

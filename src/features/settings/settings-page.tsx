@@ -9,12 +9,16 @@ import {
   EyeOff,
   GitBranch,
   KeyRound,
+  Laptop,
   Loader2,
+  LogOut,
+  MonitorSmartphone,
   Server,
   ShieldCheck,
   Smartphone,
   Sparkles,
   Trash2,
+  Tv,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -30,6 +34,7 @@ import { usePwaInstall } from "@/hooks/use-pwa-install";
 import { api, errorMessage } from "@/lib/api";
 import { openExternal } from "@/lib/links";
 import { queryKeys } from "@/lib/query";
+import type { Session } from "@/lib/types";
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
@@ -40,13 +45,42 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+const SCOPE_LABELS: Record<string, string> = {
+  "*": "Full access",
+  "library:read": "Read library",
+  "library:write": "Manage titles",
+  "progress:write": "Save progress",
+  "settings:manage": "Manage settings",
+};
+
+function scopeSummary(scopes: string[]): string {
+  if (scopes.includes("*")) return SCOPE_LABELS["*"];
+  return scopes.map((scope) => SCOPE_LABELS[scope] ?? scope).join(" · ");
+}
+
+function lastSeenLabel(seconds: number | null): string {
+  if (!seconds) return "Not seen yet";
+  const diff = Math.round(seconds - Date.now() / 1000);
+  const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+  if (Math.abs(diff) < 60) return "Active now";
+  if (Math.abs(diff) < 3600) return formatter.format(Math.round(diff / 60), "minute");
+  if (Math.abs(diff) < 86_400) return formatter.format(Math.round(diff / 3600), "hour");
+  return formatter.format(Math.round(diff / 86_400), "day");
+}
+
 export function SettingsPage() {
   const queryClient = useQueryClient();
   const [apiKey, setApiKey] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [revokeTarget, setRevokeTarget] = useState<Session | null>(null);
 
   const settings = useQuery({ queryKey: queryKeys.settings, queryFn: api.getSettings });
+  const devices = useQuery({
+    queryKey: queryKeys.devices,
+    queryFn: api.listDevices,
+    enabled: settings.data?.runtime === "server",
+  });
   const pwa = usePwaInstall();
 
   const saveKey = useMutation({
@@ -72,6 +106,20 @@ export function SettingsPage() {
       setConfirmClear(false);
       await queryClient.invalidateQueries({ queryKey: queryKeys.settings });
       toast.success("TMDB key removed.");
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  });
+
+  const revoke = useMutation({
+    mutationFn: (session: Session) => api.revokeDevice(session.id),
+    onSuccess: async (_, session) => {
+      setRevokeTarget(null);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.devices });
+      if (session.current) {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.auth });
+      } else {
+        toast.success(`${session.label ?? "Device"} signed out.`);
+      }
     },
     onError: (error) => toast.error(errorMessage(error)),
   });
@@ -253,6 +301,96 @@ export function SettingsPage() {
             </div>
           </section>
 
+          {isServer && (
+            <section className="rounded-2xl border border-border/60 bg-card/40">
+              <div className="flex gap-3 border-b border-border/60 px-5 py-4">
+                <div className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg border border-border/70 bg-background/50 text-primary">
+                  <MonitorSmartphone className="size-4" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-semibold">Connected devices</h2>
+                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                    Browsers and TVs signed in to your account. Revoke anything you no longer use.
+                  </p>
+                </div>
+              </div>
+
+              {devices.isLoading ? (
+                <div className="flex items-center justify-center gap-2 px-5 py-8 text-xs text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" />
+                  Loading devices
+                </div>
+              ) : devices.isError ? (
+                <div className="flex flex-col items-start gap-3 px-5 py-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                  <p>{errorMessage(devices.error)}</p>
+                  <Button variant="outline" size="sm" onClick={() => devices.refetch()}>
+                    Try again
+                  </Button>
+                </div>
+              ) : !devices.data?.length ? (
+                <p className="px-5 py-6 text-xs text-muted-foreground">
+                  No active sessions. Sign in on another browser or pair a TV from its screen.
+                </p>
+              ) : (
+                <ul className="divide-y divide-border/50">
+                  {devices.data.map((session) => {
+                    const Icon = session.kind === "device" ? Tv : Laptop;
+                    return (
+                      <li
+                        key={session.id}
+                        className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div className="flex min-w-0 gap-3">
+                          <div className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg border border-border/60 bg-background/50 text-muted-foreground">
+                            <Icon className="size-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <p className="truncate text-sm font-medium">
+                                {session.label ??
+                                  (session.kind === "device" ? "Paired device" : "Web browser")}
+                              </p>
+                              {session.current && (
+                                <Badge variant="secondary" className="px-1.5 py-0 text-[0.65rem]">
+                                  This browser
+                                </Badge>
+                              )}
+                              {session.kind === "device" && (
+                                <Badge variant="outline" className="px-1.5 py-0 text-[0.65rem]">
+                                  TV
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                              {scopeSummary(session.scopes)} · {lastSeenLabel(session.lastSeenAt)}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="shrink-0 self-start text-muted-foreground hover:text-destructive sm:self-auto"
+                          onClick={() => setRevokeTarget(session)}
+                        >
+                          <LogOut data-icon="inline-start" />
+                          {session.current ? "Sign out" : "Revoke"}
+                        </Button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+
+              <div className="border-t border-border/60 px-5 py-3 text-xs leading-relaxed text-muted-foreground">
+                To pair a TV, open its ArchivePlayer app and enter the code it shows at{" "}
+                <span className="font-mono text-foreground/80">
+                  {window.location.origin}/#/activate
+                </span>
+                .
+              </div>
+            </section>
+          )}
+
           <section className="rounded-2xl border border-border/60 bg-card/40">
             <div className="flex gap-3 border-b border-border/60 px-5 py-4">
               <div className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg border border-border/70 bg-background/50 text-primary">
@@ -425,6 +563,25 @@ export function SettingsPage() {
         destructive
         pending={clearKey.isPending}
         onConfirm={() => clearKey.mutate()}
+      />
+
+      <ConfirmDialog
+        open={revokeTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setRevokeTarget(null);
+        }}
+        title={revokeTarget?.current ? "Sign out this browser?" : "Revoke this device?"}
+        description={
+          revokeTarget?.current
+            ? "You will be signed out here. Your library and watch history stay on the server."
+            : `${revokeTarget?.label ?? "This device"} will stop syncing immediately and must pair again to reconnect.`
+        }
+        confirmLabel={revokeTarget?.current ? "Sign out" : "Revoke access"}
+        destructive
+        pending={revoke.isPending}
+        onConfirm={() => {
+          if (revokeTarget) revoke.mutate(revokeTarget);
+        }}
       />
     </div>
   );

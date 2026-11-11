@@ -4,9 +4,13 @@ import type {
   ArchiveSearchResponse,
   AuthStatus,
   CategorySuggestion,
+  DeviceLookup,
+  DeviceStartResponse,
+  DeviceTokenResponse,
   LibraryItem,
   LibraryResponse,
   MediaDetails,
+  Session,
   SettingsInfo,
   User,
 } from "@/lib/types";
@@ -151,6 +155,41 @@ function httpRequestFor(
       return { method: "POST", path: "/api/settings/tmdb/test" };
     case "get_app_info":
       return { method: "GET", path: "/api/app-info" };
+    case "list_devices":
+      return { method: "GET", path: "/api/devices" };
+    case "revoke_device":
+      return {
+        method: "DELETE",
+        path: `/api/devices/${segment(String(args.id ?? ""))}`,
+      };
+    case "device_start":
+      return {
+        method: "POST",
+        path: "/api/device/start",
+        body: {
+          clientName: args.clientName,
+          platform: args.platform,
+          scopes: args.scopes,
+        },
+      };
+    case "device_token":
+      return {
+        method: "POST",
+        path: "/api/device/token",
+        body: { deviceCode: args.deviceCode },
+      };
+    case "device_lookup":
+      return {
+        method: "POST",
+        path: "/api/device/lookup",
+        body: { userCode: args.userCode },
+      };
+    case "device_approve":
+      return {
+        method: "POST",
+        path: "/api/device/approve",
+        body: { userCode: args.userCode },
+      };
     default:
       throw new ApiError(`Unknown command: ${command}`, "not_found");
   }
@@ -289,5 +328,16 @@ export const api = {
   clearTmdbKey: () => call<void>("clear_tmdb_key"),
   testTmdbKey: () => call<void>("test_tmdb_key"),
   getAppInfo: () => call<AppInfo>("get_app_info"),
+
+  listDevices: () => call<Session[]>("list_devices"),
+  revokeDevice: (id: string) => call<void>("revoke_device", { id }),
+  deviceStart: (clientName: string, platform: string, scopes?: string[]) =>
+    call<DeviceStartResponse>("device_start", { clientName, platform, scopes }),
+  deviceToken: (deviceCode: string) =>
+    call<DeviceTokenResponse>("device_token", { deviceCode }),
+  deviceLookup: (userCode: string) =>
+    call<DeviceLookup>("device_lookup", { userCode }),
+  deviceApprove: (userCode: string) => call<void>("device_approve", { userCode }),
+
   openExternal: openExternalUrl,
 };

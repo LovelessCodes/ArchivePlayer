@@ -8,6 +8,7 @@ use std::time::Duration;
 
 const SCHEMA: &str = include_str!("../migrations/001_init.sql");
 const SESSION_SCHEMA: &str = include_str!("../migrations/002_sessions.sql");
+const DEVICE_SCHEMA: &str = include_str!("../migrations/003_devices.sql");
 
 const LIBRARY_SELECT: &str = r#"
     SELECT
@@ -38,6 +39,62 @@ pub struct Database {
 pub struct AuthUser {
     pub user: User,
     pub password_hash: String,
+}
+
+/// Metadata for one signed-in browser or paired device.
+#[derive(Debug, Clone)]
+pub struct SessionRecord {
+    pub public_id: String,
+    pub user_id: i64,
+    pub kind: String,
+    pub label: Option<String>,
+    pub platform: Option<String>,
+    pub scopes: Vec<String>,
+    pub created_at: String,
+    pub last_seen_at: Option<i64>,
+    pub expires_at: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct AuthSession {
+    pub user: User,
+    pub session: SessionRecord,
+}
+
+#[derive(Debug, Clone)]
+pub struct NewSession {
+    pub token_hash: String,
+    pub user_id: i64,
+    pub expires_at: i64,
+    pub kind: String,
+    pub label: Option<String>,
+    pub platform: Option<String>,
+    pub scopes: Vec<String>,
+    pub last_seen_at: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct NewDeviceAuthorization {
+    pub device_code_hash: String,
+    pub user_code_hash: String,
+    pub client_name: String,
+    pub platform: String,
+    pub scopes: Vec<String>,
+    pub expires_at: i64,
+    pub interval_seconds: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct DeviceAuthorization {
+    pub id: i64,
+    pub client_name: String,
+    pub platform: String,
+    pub scopes: Vec<String>,
+    pub status: String,
+    pub user_id: Option<i64>,
+    pub expires_at: i64,
+    pub interval_seconds: i64,
+    pub last_polled_at: Option<i64>,
 }
 
 #[derive(Debug, Clone)]
@@ -78,6 +135,39 @@ pub struct UserMediaRow {
     pub autoplay_enabled: bool,
 }
 
+fn parse_scopes(raw: &str) -> Vec<String> {
+    // A malformed scope list must grant nothing, never full access.
+    serde_json::from_str(raw).unwrap_or_default()
+}
+
+fn map_session(row: &Row<'_>) -> rusqlite::Result<SessionRecord> {
+    Ok(SessionRecord {
+        public_id: row.get(0)?,
+        user_id: row.get(1)?,
+        kind: row.get(2)?,
+        label: row.get(3)?,
+        platform: row.get(4)?,
+        scopes: parse_scopes(&row.get::<_, String>(5)?),
+        created_at: row.get(6)?,
+        last_seen_at: row.get(7)?,
+        expires_at: row.get(8)?,
+    })
+}
+
+fn map_device_authorization(row: &Row<'_>) -> rusqlite::Result<DeviceAuthorization> {
+    Ok(DeviceAuthorization {
+        id: row.get(0)?,
+        client_name: row.get(1)?,
+        platform: row.get(2)?,
+        scopes: parse_scopes(&row.get::<_, String>(3)?),
+        status: row.get(4)?,
+        user_id: row.get(5)?,
+        expires_at: row.get(6)?,
+        interval_seconds: row.get(7)?,
+        last_polled_at: row.get(8)?,
+    })
+}
+
 impl Database {
     pub fn open(path: &Path) -> CoreResult<Self> {
         if let Some(parent) = path.parent() {
@@ -103,8 +193,16 @@ impl Database {
              PRAGMA journal_mode = WAL;
              PRAGMA synchronous = NORMAL;",
         )?;
-        connection.execute_batch(SCHEMA)?;
-        connection.execute_batch(SESSION_SCHEMA)?;
+        let version: i64 = connection.pragma_query_value(None, "user_version", |row| row.get(0))?;
+        if version < 1 {
+            connection.execute_batch(SCHEMA)?;
+        }
+        if version < 2 {
+            connection.execute_batch(SESSION_SCHEMA)?;
+        }
+        if version < 3 {
+            connection.execute_batch(DEVICE_SCHEMA)?;
+        }
         Ok(Self {
             connection: Mutex::new(connection),
         })
@@ -214,41 +312,86 @@ impl Database {
 
     // ------------------------------------------------------------- sessions
 
-    pub fn create_session(
-        &self,
-        token_hash: &str,
-        user_id: i64,
-        expires_at: i64,
-    ) -> CoreResult<()> {
+    pub fn create_session(&self, session: NewSession) -> CoreResult<()> {
+        let scopes = serde_json::to_string(&session.scopes)?;
         self.with_connection(|conn| {
             conn.execute(
-                "INSERT INTO sessions (token_hash, user_id, expires_at, created_at)
-                 VALUES (?1, ?2, ?3, ?4)",
-                params![token_hash, user_id, expires_at, now_rfc3339()],
+                "INSERT INTO sessions
+                    (public_id, token_hash, user_id, expires_at, created_at, kind, label,
+                     platform, scopes, last_seen_at)
+                 VALUES (lower(hex(randomblob(8))), ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                params![
+                    session.token_hash,
+                    session.user_id,
+                    session.expires_at,
+                    now_rfc3339(),
+                    session.kind,
+                    session.label,
+                    session.platform,
+                    scopes,
+                    session.last_seen_at,
+                ],
             )?;
             Ok(())
         })
     }
 
-    pub fn session_user(&self, token_hash: &str, now: i64) -> CoreResult<Option<User>> {
+    pub fn session_auth(&self, token_hash: &str, now: i64) -> CoreResult<Option<AuthSession>> {
         self.with_connection(|conn| {
             Ok(conn
                 .query_row(
-                    "SELECT u.id, u.email, u.display_name, u.created_at
+                    "SELECT s.public_id, s.user_id, s.kind, s.label, s.platform, s.scopes,
+                            s.created_at, s.last_seen_at, s.expires_at,
+                            u.id, u.email, u.display_name, u.created_at
                      FROM sessions s
                      JOIN users u ON u.id = s.user_id
                      WHERE s.token_hash = ?1 AND s.expires_at > ?2",
                     params![token_hash, now],
                     |row| {
-                        Ok(User {
-                            id: row.get(0)?,
-                            email: row.get(1)?,
-                            display_name: row.get(2)?,
-                            created_at: row.get(3)?,
+                        Ok(AuthSession {
+                            session: map_session(row)?,
+                            user: User {
+                                id: row.get(9)?,
+                                email: row.get(10)?,
+                                display_name: row.get(11)?,
+                                created_at: row.get(12)?,
+                            },
                         })
                     },
                 )
                 .optional()?)
+        })
+    }
+
+    pub fn session_user(&self, token_hash: &str, now: i64) -> CoreResult<Option<User>> {
+        Ok(self
+            .session_auth(token_hash, now)?
+            .map(|session| session.user))
+    }
+
+    /// Avoid a write on every request while still keeping device lists fresh.
+    pub fn touch_session(&self, token_hash: &str, now: i64) -> CoreResult<()> {
+        self.with_connection(|conn| {
+            conn.execute(
+                "UPDATE sessions SET last_seen_at = ?2
+                 WHERE token_hash = ?1 AND (last_seen_at IS NULL OR last_seen_at < ?2 - 60)",
+                params![token_hash, now],
+            )?;
+            Ok(())
+        })
+    }
+
+    pub fn list_sessions(&self, user_id: i64, now: i64) -> CoreResult<Vec<SessionRecord>> {
+        self.with_connection(|conn| {
+            let mut statement = conn.prepare(
+                "SELECT public_id, user_id, kind, label, platform, scopes, created_at,
+                        last_seen_at, expires_at
+                 FROM sessions
+                 WHERE user_id = ?1 AND expires_at > ?2
+                 ORDER BY COALESCE(last_seen_at, 0) DESC, created_at DESC",
+            )?;
+            let rows = statement.query_map(params![user_id, now], map_session)?;
+            Ok(rows.collect::<Result<Vec<_>, _>>()?)
         })
     }
 
@@ -262,9 +405,214 @@ impl Database {
         })
     }
 
+    pub fn delete_session_by_public_id(&self, user_id: i64, public_id: &str) -> CoreResult<bool> {
+        self.with_connection(|conn| {
+            let changed = conn.execute(
+                "DELETE FROM sessions WHERE user_id = ?1 AND public_id = ?2",
+                params![user_id, public_id],
+            )?;
+            Ok(changed > 0)
+        })
+    }
+
     pub fn delete_expired_sessions(&self, now: i64) -> CoreResult<()> {
         self.with_connection(|conn| {
             conn.execute("DELETE FROM sessions WHERE expires_at <= ?1", params![now])?;
+            Ok(())
+        })
+    }
+
+    // ------------------------------------------------------------ device pairing
+
+    pub fn create_device_authorization(
+        &self,
+        authorization: NewDeviceAuthorization,
+    ) -> CoreResult<()> {
+        let scopes = serde_json::to_string(&authorization.scopes)?;
+        self.with_connection(|conn| {
+            conn.execute(
+                "INSERT INTO device_authorizations
+                    (device_code_hash, user_code_hash, client_name, platform, scopes,
+                     interval_seconds, expires_at, created_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                params![
+                    authorization.device_code_hash,
+                    authorization.user_code_hash,
+                    authorization.client_name,
+                    authorization.platform,
+                    scopes,
+                    authorization.interval_seconds,
+                    authorization.expires_at,
+                    now_rfc3339(),
+                ],
+            )
+            .map_err(|error| match error {
+                rusqlite::Error::SqliteFailure(code, _)
+                    if code.code == rusqlite::ErrorCode::ConstraintViolation =>
+                {
+                    CoreError::Conflict("A pairing code collision occurred.".into())
+                }
+                other => CoreError::Database(other),
+            })?;
+            Ok(())
+        })
+    }
+
+    pub fn device_authorization_by_device_code(
+        &self,
+        device_code_hash: &str,
+    ) -> CoreResult<Option<DeviceAuthorization>> {
+        self.with_connection(|conn| {
+            Ok(conn
+                .query_row(
+                    "SELECT id, client_name, platform, scopes, status, user_id, expires_at,
+                            interval_seconds, last_polled_at
+                     FROM device_authorizations WHERE device_code_hash = ?1",
+                    params![device_code_hash],
+                    map_device_authorization,
+                )
+                .optional()?)
+        })
+    }
+
+    pub fn device_authorization_by_user_code(
+        &self,
+        user_code_hash: &str,
+    ) -> CoreResult<Option<DeviceAuthorization>> {
+        self.with_connection(|conn| {
+            Ok(conn
+                .query_row(
+                    "SELECT id, client_name, platform, scopes, status, user_id, expires_at,
+                            interval_seconds, last_polled_at
+                     FROM device_authorizations WHERE user_code_hash = ?1",
+                    params![user_code_hash],
+                    map_device_authorization,
+                )
+                .optional()?)
+        })
+    }
+
+    pub fn set_device_authorization_status(
+        &self,
+        user_code_hash: &str,
+        user_id: i64,
+        status: &str,
+        now: i64,
+    ) -> CoreResult<Option<DeviceAuthorization>> {
+        self.with_connection(|conn| {
+            let changed = conn.execute(
+                "UPDATE device_authorizations
+                 SET status = ?3, user_id = ?2, approved_at = ?4
+                 WHERE user_code_hash = ?1 AND status = 'pending' AND expires_at > ?5",
+                params![user_code_hash, user_id, status, now_rfc3339(), now],
+            )?;
+            if changed == 0 {
+                return Ok(None);
+            }
+            Ok(conn
+                .query_row(
+                    "SELECT id, client_name, platform, scopes, status, user_id, expires_at,
+                            interval_seconds, last_polled_at
+                     FROM device_authorizations WHERE user_code_hash = ?1",
+                    params![user_code_hash],
+                    map_device_authorization,
+                )
+                .optional()?)
+        })
+    }
+
+    pub fn record_device_poll(&self, id: i64, now: i64) -> CoreResult<()> {
+        self.with_connection(|conn| {
+            conn.execute(
+                "UPDATE device_authorizations SET last_polled_at = ?2 WHERE id = ?1",
+                params![id, now],
+            )?;
+            Ok(())
+        })
+    }
+
+    /// Atomically marks an approved pairing as consumed and creates the device
+    /// session. Returning `None` means another poll already redeemed it.
+    pub fn redeem_device_authorization(
+        &self,
+        device_code_hash: &str,
+        token_hash: &str,
+        expires_at: i64,
+        now: i64,
+    ) -> CoreResult<Option<User>> {
+        self.with_connection(|conn| {
+            let transaction = conn.transaction()?;
+            let record = transaction
+                .query_row(
+                    "SELECT id, client_name, platform, scopes, user_id
+                     FROM device_authorizations
+                     WHERE device_code_hash = ?1 AND status = 'approved' AND expires_at > ?2",
+                    params![device_code_hash, now],
+                    |row| {
+                        Ok((
+                            row.get::<_, i64>(0)?,
+                            row.get::<_, String>(1)?,
+                            row.get::<_, String>(2)?,
+                            row.get::<_, String>(3)?,
+                            row.get::<_, Option<i64>>(4)?,
+                        ))
+                    },
+                )
+                .optional()?;
+            let Some((id, label, platform, scopes, Some(user_id))) = record else {
+                return Ok(None);
+            };
+
+            let changed = transaction.execute(
+                "UPDATE device_authorizations
+                 SET status = 'consumed', consumed_at = ?2
+                 WHERE id = ?1 AND status = 'approved'",
+                params![id, now_rfc3339()],
+            )?;
+            if changed == 0 {
+                return Ok(None);
+            }
+
+            transaction.execute(
+                "INSERT INTO sessions
+                    (public_id, token_hash, user_id, expires_at, created_at, kind, label,
+                     platform, scopes, last_seen_at)
+                 VALUES (lower(hex(randomblob(8))), ?1, ?2, ?3, ?4, 'device', ?5, ?6, ?7, ?8)",
+                params![
+                    token_hash,
+                    user_id,
+                    expires_at,
+                    now_rfc3339(),
+                    label,
+                    platform,
+                    scopes,
+                    now,
+                ],
+            )?;
+
+            let user = transaction.query_row(
+                "SELECT id, email, display_name, created_at FROM users WHERE id = ?1",
+                params![user_id],
+                |row| {
+                    Ok(User {
+                        id: row.get(0)?,
+                        email: row.get(1)?,
+                        display_name: row.get(2)?,
+                        created_at: row.get(3)?,
+                    })
+                },
+            )?;
+            transaction.commit()?;
+            Ok(Some(user))
+        })
+    }
+
+    pub fn delete_expired_device_authorizations(&self, now: i64) -> CoreResult<()> {
+        self.with_connection(|conn| {
+            conn.execute(
+                "DELETE FROM device_authorizations WHERE expires_at <= ?1",
+                params![now],
+            )?;
             Ok(())
         })
     }
@@ -839,12 +1187,26 @@ mod tests {
         assert!(db.continue_watching(user.id, 10).unwrap().is_empty());
     }
 
+    fn new_session(token_hash: &str, user_id: i64, expires_at: i64) -> NewSession {
+        NewSession {
+            token_hash: token_hash.to_string(),
+            user_id,
+            expires_at,
+            kind: "browser".into(),
+            label: None,
+            platform: None,
+            scopes: vec!["*".into()],
+            last_seen_at: 0,
+        }
+    }
+
     #[test]
     fn stores_expires_and_deletes_sessions() {
         let db = database();
         let user = seed_user(&db);
 
-        db.create_session("token-hash", user.id, 200).unwrap();
+        db.create_session(new_session("token-hash", user.id, 200))
+            .unwrap();
         assert_eq!(
             db.session_user("token-hash", 100).unwrap().unwrap().id,
             user.id
@@ -854,10 +1216,46 @@ mod tests {
         db.delete_expired_sessions(200).unwrap();
         assert!(db.session_user("token-hash", 100).unwrap().is_none());
 
-        db.create_session("other-hash", user.id, 300).unwrap();
+        db.create_session(new_session("other-hash", user.id, 300))
+            .unwrap();
         db.delete_session("other-hash").unwrap();
         assert!(db.session_user("other-hash", 100).unwrap().is_none());
         assert_eq!(db.first_user_id().unwrap(), Some(user.id));
+    }
+
+    #[test]
+    fn upgrades_existing_sessions_to_v3() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("legacy.db");
+        let now = chrono::Utc::now().timestamp();
+        {
+            let connection = Connection::open(&path).unwrap();
+            connection.execute_batch(SCHEMA).unwrap();
+            connection.execute_batch(SESSION_SCHEMA).unwrap();
+            connection
+                .execute(
+                    "INSERT INTO users (email, display_name, password_hash, created_at)
+                     VALUES ('legacy@example.com', 'Legacy', 'hash', ?1)",
+                    params![now_rfc3339()],
+                )
+                .unwrap();
+            connection
+                .execute(
+                    "INSERT INTO sessions (token_hash, user_id, expires_at, created_at)
+                     VALUES ('legacy-token', 1, ?1, ?2)",
+                    params![now + 3600, now_rfc3339()],
+                )
+                .unwrap();
+        }
+
+        let db = Database::open(&path).unwrap();
+        let session = db.session_auth("legacy-token", now).unwrap().unwrap();
+        assert_eq!(session.user.email, "legacy@example.com");
+        assert_eq!(session.session.kind, "browser");
+        assert_eq!(session.session.scopes, vec!["*".to_string()]);
+        assert!(!session.session.public_id.is_empty());
+        assert!(session.session.last_seen_at.is_some());
+        assert!(db.list_sessions(1, now).unwrap()[0].public_id.len() == 16);
     }
 
     #[test]

@@ -9,6 +9,11 @@ pub struct Config {
     pub secure_cookies: bool,
     pub allow_registration: bool,
     pub session_days: i64,
+    pub device_session_days: i64,
+    pub public_url: Option<String>,
+    /// Exact browser origins allowed to call the API from another origin.
+    /// Native Android apps do not need this; webOS and other web runtimes do.
+    pub cors_origins: Vec<String>,
 }
 
 impl Config {
@@ -29,16 +34,32 @@ impl Config {
         let secure_cookies = env_bool("ARCHIVEPLAYER_SECURE_COOKIES", false)?;
         let allow_registration = env_bool("ARCHIVEPLAYER_ALLOW_REGISTRATION", false)?;
 
-        let session_days = std::env::var("ARCHIVEPLAYER_SESSION_DAYS")
+        let session_days = env_days("ARCHIVEPLAYER_SESSION_DAYS", 30, 365)?;
+        let device_session_days = env_days("ARCHIVEPLAYER_DEVICE_SESSION_DAYS", 180, 3650)?;
+
+        let public_url = std::env::var("ARCHIVEPLAYER_PUBLIC_URL")
             .ok()
-            .map(|value| {
-                value
-                    .parse::<i64>()
-                    .map_err(|error| format!("Invalid ARCHIVEPLAYER_SESSION_DAYS: {error}"))
+            .map(|value| value.trim().trim_end_matches('/').to_string())
+            .filter(|value| !value.is_empty());
+
+        let cors_origins = std::env::var("ARCHIVEPLAYER_CORS_ORIGINS")
+            .unwrap_or_default()
+            .split(',')
+            .map(str::trim)
+            .filter(|origin| !origin.is_empty())
+            .map(|origin| {
+                if origin == "null"
+                    || origin.starts_with("http://")
+                    || origin.starts_with("https://")
+                {
+                    Ok(origin.to_string())
+                } else {
+                    Err(format!(
+                        "Invalid ARCHIVEPLAYER_CORS_ORIGINS entry: {origin}"
+                    ))
+                }
             })
-            .transpose()?
-            .unwrap_or(30)
-            .clamp(1, 365);
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(Self {
             bind,
@@ -47,8 +68,24 @@ impl Config {
             secure_cookies,
             allow_registration,
             session_days,
+            device_session_days,
+            public_url,
+            cors_origins,
         })
     }
+}
+
+fn env_days(name: &str, default: i64, max: i64) -> Result<i64, String> {
+    Ok(std::env::var(name)
+        .ok()
+        .map(|value| {
+            value
+                .parse::<i64>()
+                .map_err(|error| format!("Invalid {name}: {error}"))
+        })
+        .transpose()?
+        .unwrap_or(default)
+        .clamp(1, max))
 }
 
 fn env_bool(name: &str, default: bool) -> Result<bool, String> {
