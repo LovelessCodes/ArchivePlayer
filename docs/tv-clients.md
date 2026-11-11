@@ -8,6 +8,11 @@ opaque bearer token.
 This document describes the stable HTTP contract. The desktop app does not expose
 these endpoints; they are part of the self-hosted server.
 
+A reference implementation is available as a native Android TV app:
+[LovelessCodes/ArchivePlayer-AndroidTV](https://github.com/LovelessCodes/ArchivePlayer-AndroidTV).
+It uses NSD for discovery, pairs through this device flow, stores the token in
+the Android Keystore, and plays through Media3/ExoPlayer.
+
 ## Discovery
 
 A client should not make the user type an IP address on a remote control. When the
