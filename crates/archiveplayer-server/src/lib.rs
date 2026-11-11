@@ -1,9 +1,13 @@
 mod auth;
 pub mod config;
+pub mod discovery;
 mod error;
+mod rate_limit;
 mod routes;
 mod session;
 mod state;
+
+pub const API_VERSION: u32 = 1;
 
 pub use config::Config;
 pub use state::{AppState, SharedState};
@@ -55,6 +59,7 @@ pub fn build_router(state: SharedState) -> Router {
     let index = state.config.static_dir.join("index.html");
     let static_files =
         ServeDir::new(&state.config.static_dir).not_found_service(ServeFile::new(index));
+    let limiter = rate_limit::RateLimiter::from_config(&state.config);
 
     let mut router = Router::new()
         .nest("/api", routes::api_router(state))
@@ -79,6 +84,8 @@ pub fn build_router(state: SharedState) -> Router {
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http());
 
+    router = router.layer(middleware::from_fn_with_state(limiter, rate_limit::enforce));
+
     if !cors_origins.is_empty() {
         let origins: Vec<HeaderValue> = cors_origins
             .iter()
@@ -94,7 +101,8 @@ pub fn build_router(state: SharedState) -> Router {
                     Method::PATCH,
                     Method::DELETE,
                 ])
-                .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]),
+                .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
+                .expose_headers([header::RETRY_AFTER]),
         );
     }
 

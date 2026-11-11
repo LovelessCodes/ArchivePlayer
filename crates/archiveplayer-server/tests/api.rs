@@ -15,6 +15,10 @@ struct TestApp {
 }
 
 fn test_app() -> TestApp {
+    test_app_with(|_| {})
+}
+
+fn test_app_with(configure: impl FnOnce(&mut Config)) -> TestApp {
     let dir = tempfile::tempdir().unwrap();
     let static_dir = dir.path().join("static");
     std::fs::create_dir_all(&static_dir).unwrap();
@@ -26,7 +30,7 @@ fn test_app() -> TestApp {
     std::fs::create_dir_all(static_dir.join("assets")).unwrap();
     std::fs::write(static_dir.join("assets/app-abc123.js"), "console.log(1);").unwrap();
 
-    let config = Config {
+    let mut config = Config {
         bind: "127.0.0.1:0".parse().unwrap(),
         data_dir: dir.path().join("data"),
         static_dir,
@@ -36,7 +40,14 @@ fn test_app() -> TestApp {
         device_session_days: 180,
         public_url: None,
         cors_origins: vec![],
+        mdns: false,
+        server_name: None,
+        trust_proxy: false,
+        rate_limit_per_minute: 0,
+        auth_rate_limit_per_minute: 0,
+        device_rate_limit_per_minute: 0,
     };
+    configure(&mut config);
     let service = Service::new(config.data_dir.clone()).unwrap();
     let state = app_state(service, config);
     TestApp {
@@ -133,6 +144,58 @@ async fn health_is_public() {
     );
     let body = body_json(response).await;
     assert_eq!(body["status"], "ok");
+    assert_eq!(body["apiVersion"], 1);
+}
+
+#[tokio::test]
+async fn auth_rate_limit_returns_retry_after() {
+    let app = test_app_with(|config| {
+        config.trust_proxy = true;
+        config.auth_rate_limit_per_minute = 1;
+    });
+    let request = |address: &'static str| {
+        Request::builder()
+            .method("POST")
+            .uri("/api/auth/login")
+            .header(header::CONTENT_TYPE, "application/json")
+            .header("x-forwarded-for", address)
+            .body(Body::from("{}"))
+            .unwrap()
+    };
+
+    let response = app
+        .router
+        .clone()
+        .oneshot(request("203.0.113.9"))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    let response = app
+        .router
+        .clone()
+        .oneshot(request("203.0.113.9"))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert!(
+        response
+            .headers()
+            .get(header::RETRY_AFTER)
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.parse::<u64>().ok())
+            .is_some_and(|seconds| seconds >= 1)
+    );
+    assert_eq!(body_json(response).await["code"], "rate_limited");
+
+    // A different client address has its own bucket.
+    let response = app
+        .router
+        .clone()
+        .oneshot(request("203.0.113.10"))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
 
 #[tokio::test]

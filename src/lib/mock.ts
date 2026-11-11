@@ -556,7 +556,7 @@ export async function mockInvoke<T>(command: string, args?: Record<string, unkno
           dataDir: "~/Library/Application Support/ArchivePlayer (demo)",
           settingsPath: "~/Library/Application Support/ArchivePlayer/settings.json",
           databasePath: "~/Library/Application Support/ArchivePlayer/archiveplayer.db",
-          appVersion: "0.4.0 (browser demo)",
+          appVersion: "0.5.0 (browser demo)",
           canManageSettings: true,
           runtime: "server",
         };
@@ -579,7 +579,7 @@ export async function mockInvoke<T>(command: string, args?: Record<string, unkno
       case "get_app_info":
         requireUser();
         return {
-          version: "0.4.0 (browser demo)",
+          version: "0.5.0 (browser demo)",
           dataDir: "~/Library/Application Support/ArchivePlayer (demo)",
           settingsPath: "~/Library/Application Support/ArchivePlayer/settings.json",
           databasePath: "~/Library/Application Support/ArchivePlayer/archiveplayer.db",

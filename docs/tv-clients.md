@@ -8,10 +8,53 @@ opaque bearer token.
 This document describes the stable HTTP contract. The desktop app does not expose
 these endpoints; they are part of the self-hosted server.
 
+## Discovery
+
+A client should not make the user type an IP address on a remote control. When the
+server binds to a LAN address, it advertises this DNS-SD service:
+
+```text
+_archiveplayer._tcp.local
+```
+
+TXT records:
+
+| Key | Meaning |
+| --- | --- |
+| `name` | Friendly server name, e.g. `Living Room NAS`. |
+| `id` | Stable server ID; use it to de-duplicate and remember servers. |
+| `api` | API generation, currently `1`. |
+| `version` | Server package version, e.g. `0.5.0`. |
+| `path` | Web root, currently `/`. |
+| `url` | Optional public HTTPS base URL from `ARCHIVEPLAYER_PUBLIC_URL`. |
+
+On Android TV, use `NsdManager` to browse for `_archiveplayer._tcp` and resolve
+the service. Prefer the `url` property when it is present and valid HTTPS;
+otherwise build `http://<resolved-host>:<port>` from the SRV record. Show the
+discovered name and URL before connecting. Discovery is unauthenticated, so
+treat it as a hint, not proof of identity.
+
+The advertisement is skipped when the server binds to loopback. Docker bridge
+networks do not forward multicast to the LAN; use host networking or a host-side
+Avahi advertisement if discovery is required.
+
+## API version
+
+`GET /api/health` is public and returns the contract generation:
+
+```json
+{ "status": "ok", "version": "0.5.0", "apiVersion": 1 }
+```
+
+Refuse to pair if `apiVersion` is newer than the client supports. Missing
+`apiVersion` means a pre-0.5 server; the pairing endpoints above are still
+compatible.
+
 ## Endpoints
 
 | Method | Path | Authentication | Purpose |
 | --- | --- | --- | --- |
+| `GET` | `/api/health` | none | Health and API version. |
 | `POST` | `/api/device/start` | none | Start a pairing request. |
 | `POST` | `/api/device/token` | device code | Poll for approval and redeem the token. |
 | `POST` | `/api/device/lookup` | browser cookie | Inspect a pending request by user code. |
@@ -58,7 +101,8 @@ Show `userCode` on the TV and, if it has a display, a QR code for
 person types into the browser.
 
 `ARCHIVEPLAYER_PUBLIC_URL` controls the host used in the verification URLs. If it
-is unset, the server uses the request `Host` header and `X-Forwarded-Proto`.
+is unset, the server uses the request `Host` header. `X-Forwarded-Proto` is only
+trusted when `ARCHIVEPLAYER_TRUST_PROXY=true`.
 
 ## 2. Poll for the token
 
@@ -80,6 +124,9 @@ While waiting:
 
 `HTTP 400` with `authorization_pending`, `access_denied`, `expired_token`, or
 `invalid_grant`. `HTTP 429` with `slow_down` means the previous poll was too soon.
+The pairing endpoints also have a per-IP request limit; a generic
+`HTTP 429` with `code: "rate_limited"` includes a `Retry-After` header in
+seconds. Honour it and back off rather than retrying immediately.
 
 After approval, the response is `HTTP 200`:
 
@@ -155,6 +202,33 @@ platform, and requested scopes, then `POST /api/device/approve`.
 
 `DELETE /api/devices/{id}` revokes a session. Revoking the current browser session
 also clears its cookie.
+
+## Remote access
+
+mDNS only works on the same LAN. For a server reached over the internet, keep a
+stable HTTPS endpoint and let the client store two addresses per server:
+
+```text
+lanUrl      // discovered on the local network
+remoteUrl   // ARCHIVEPLAYER_PUBLIC_URL
+```
+
+Try `lanUrl` first and fall back to `remoteUrl` on timeout. Pairing at home is
+enough: discovery can return the public URL in its TXT record, so the client can
+remember it for travel without asking the user to type it on the TV.
+
+Recommended deployment options:
+
+- **Tailscale / WireGuard** — private access without opening ports; works through
+  CGNAT. Use MagicDNS or a stable tailnet hostname.
+- **TLS reverse proxy** — Caddy, nginx, or Traefik with a real certificate. Set
+  `ARCHIVEPLAYER_TRUST_PROXY=true` so forwarding headers are trusted.
+- **Cloudflare Tunnel** — outbound-only HTTPS with no open ports; adds a third
+  party in front of the API. Video still comes directly from Archive.org.
+
+Never expose the raw HTTP port to the internet. For a reverse proxy, rate
+limiting uses the proxy address unless `ARCHIVEPLAYER_TRUST_PROXY=true`; without
+that setting all clients share one bucket.
 
 ## Client notes
 

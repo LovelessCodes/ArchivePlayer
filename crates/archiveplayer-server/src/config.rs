@@ -14,6 +14,20 @@ pub struct Config {
     /// Exact browser origins allowed to call the API from another origin.
     /// Native Android apps do not need this; webOS and other web runtimes do.
     pub cors_origins: Vec<String>,
+    /// Advertise the server on the local network with mDNS/DNS-SD.
+    pub mdns: bool,
+    /// Friendly name shown by LAN discovery. Defaults to the machine hostname.
+    pub server_name: Option<String>,
+    /// Trust `X-Forwarded-For` / `X-Real-IP` when rate limiting and building
+    /// pairing links. Only enable this when a trusted reverse proxy overwrites
+    /// those headers.
+    pub trust_proxy: bool,
+    /// Requests per minute allowed for general API traffic. 0 disables it.
+    pub rate_limit_per_minute: u32,
+    /// Requests per minute allowed for login and registration. 0 disables it.
+    pub auth_rate_limit_per_minute: u32,
+    /// Requests per minute allowed for device pairing endpoints. 0 disables it.
+    pub device_rate_limit_per_minute: u32,
 }
 
 impl Config {
@@ -41,6 +55,17 @@ impl Config {
             .ok()
             .map(|value| value.trim().trim_end_matches('/').to_string())
             .filter(|value| !value.is_empty());
+
+        let mdns = env_bool("ARCHIVEPLAYER_MDNS", true)?;
+        let server_name = std::env::var("ARCHIVEPLAYER_SERVER_NAME")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
+        let trust_proxy = env_bool("ARCHIVEPLAYER_TRUST_PROXY", false)?;
+        let rate_limit_per_minute = env_u32("ARCHIVEPLAYER_RATE_LIMIT_PER_MINUTE", 240)?;
+        let auth_rate_limit_per_minute = env_u32("ARCHIVEPLAYER_AUTH_RATE_LIMIT_PER_MINUTE", 10)?;
+        let device_rate_limit_per_minute =
+            env_u32("ARCHIVEPLAYER_DEVICE_RATE_LIMIT_PER_MINUTE", 60)?;
 
         let cors_origins = std::env::var("ARCHIVEPLAYER_CORS_ORIGINS")
             .unwrap_or_default()
@@ -71,6 +96,12 @@ impl Config {
             device_session_days,
             public_url,
             cors_origins,
+            mdns,
+            server_name,
+            trust_proxy,
+            rate_limit_per_minute,
+            auth_rate_limit_per_minute,
+            device_rate_limit_per_minute,
         })
     }
 }
@@ -86,6 +117,20 @@ fn env_days(name: &str, default: i64, max: i64) -> Result<i64, String> {
         .transpose()?
         .unwrap_or(default)
         .clamp(1, max))
+}
+
+fn env_u32(name: &str, default: u32) -> Result<u32, String> {
+    Ok(std::env::var(name)
+        .ok()
+        .map(|value| {
+            value
+                .trim()
+                .parse::<u32>()
+                .map(|value| value.min(100_000))
+                .map_err(|error| format!("Invalid {name}: {error}"))
+        })
+        .transpose()?
+        .unwrap_or(default))
 }
 
 fn env_bool(name: &str, default: bool) -> Result<bool, String> {

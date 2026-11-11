@@ -67,9 +67,11 @@ async fn api_not_found() -> ApiError {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct Health {
     status: &'static str,
     version: &'static str,
+    api_version: u32,
 }
 
 async fn health(State(state): State<SharedState>) -> ApiResult<Json<Health>> {
@@ -77,6 +79,7 @@ async fn health(State(state): State<SharedState>) -> ApiResult<Json<Health>> {
     Ok(Json(Health {
         status: "ok",
         version: env!("CARGO_PKG_VERSION"),
+        api_version: crate::API_VERSION,
     }))
 }
 
@@ -529,11 +532,15 @@ fn verification_base(state: &AppState, headers: &HeaderMap) -> String {
         .and_then(|value| value.to_str().ok())
         .filter(|value| !value.is_empty())
         .unwrap_or(&fallback);
-    let scheme = headers
-        .get("x-forwarded-proto")
-        .and_then(|value| value.to_str().ok())
-        .filter(|value| *value == "https")
-        .unwrap_or("http");
+    let scheme = if state.config.trust_proxy {
+        headers
+            .get("x-forwarded-proto")
+            .and_then(|value| value.to_str().ok())
+            .filter(|value| *value == "https")
+            .unwrap_or("http")
+    } else {
+        "http"
+    };
     format!("{scheme}://{host}")
 }
 

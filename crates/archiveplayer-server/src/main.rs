@@ -1,6 +1,7 @@
 use archiveplayer_core::Service;
-use archiveplayer_server::{Config, app_state, build_router};
+use archiveplayer_server::{Config, app_state, build_router, discovery};
 use std::error::Error;
+use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 
@@ -34,13 +35,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
         service.data_dir.display()
     );
 
+    let _mdns = discovery::start(&config, service.data_dir());
+
     let listener = TcpListener::bind(config.bind).await?;
     tracing::info!("listening on http://{}", config.bind);
     tracing::info!("serving frontend from {}", config.static_dir.display());
 
-    axum::serve(listener, build_router(app_state(service, config)))
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+    axum::serve(
+        listener,
+        build_router(app_state(service, config))
+            .into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await?;
 
     Ok(())
 }

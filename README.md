@@ -116,8 +116,8 @@ cargo run -p archiveplayer-server --release
 
 Open `http://localhost:8080`. The first account you create is the **server owner**;
 after that, registration is closed unless you explicitly enable it. The server
-serves the built `dist/` directory and stores SQLite plus `settings.json` in
-`ARCHIVEPLAYER_DATA_DIR` (default `./data`).
+serves the built `dist/` directory and stores SQLite, `settings.json`, and a
+stable `server-id` in `ARCHIVEPLAYER_DATA_DIR` (default `./data`).
 
 #### Docker
 
@@ -132,7 +132,10 @@ multi-arch (`linux/amd64`, `linux/arm64`); published images are available at
 
 To reach it from other devices, put a TLS reverse proxy (Caddy, nginx, Traefik)
 in front of it and change the port mapping to `"8080:8080"` only on a trusted
-network. Set `ARCHIVEPLAYER_SECURE_COOKIES=true` when the public URL is HTTPS.
+network. Set `ARCHIVEPLAYER_SECURE_COOKIES=true` when the public URL is HTTPS,
+and `ARCHIVEPLAYER_TRUST_PROXY=true` when the proxy sets forwarding headers.
+Docker bridge networking does not forward mDNS, so keep
+`ARCHIVEPLAYER_MDNS=false` unless the container uses host networking.
 
 #### Install it as an app
 
@@ -164,17 +167,55 @@ notes; pair over HTTPS before exposing the server outside your network.
 
 ![Approving a TV from the browser](docs/screenshots/desktop-activate.webp)
 
+#### Discover the server on a LAN
+
+When the server binds to a LAN address, it advertises itself over mDNS/DNS-SD:
+
+```text
+_archiveplayer._tcp.local
+```
+
+The TXT record includes the friendly name, a stable server ID, the API version,
+and `ARCHIVEPLAYER_PUBLIC_URL` when configured. A TV can list nearby servers
+and connect with one tap instead of asking for an IP address.
+
+mDNS is best-effort and optional. It is skipped when the server binds to
+`127.0.0.1`, and Docker's default bridge network does not forward multicast to
+the LAN. For Docker discovery, use `network_mode: host` on Linux or advertise
+from the host with Avahi; otherwise leave `ARCHIVEPLAYER_MDNS=false` and enter
+the server address once. Set `ARCHIVEPLAYER_SERVER_NAME` to control the name
+shown on the TV.
+
+#### Reach the server while travelling
+
+Keep `ARCHIVEPLAYER_PUBLIC_URL` pointed at a stable HTTPS address and pair the
+TV while it can reach the server. A client can store both the discovered LAN
+address and the public URL, then fall back to the public URL when away from
+home.
+
+Do not expose port 8080 directly. Put Caddy, nginx, or Traefik in front of it,
+or use Tailscale, WireGuard, or Cloudflare Tunnel. When a reverse proxy supplies
+`X-Forwarded-For` / `X-Forwarded-Proto`, set `ARCHIVEPLAYER_TRUST_PROXY=true` so
+rate limiting uses the real client address and pairing links use the right
+scheme.
+
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `ARCHIVEPLAYER_BIND` | `127.0.0.1:8080` (Docker: `0.0.0.0:8080`) | Listen address. |
-| `ARCHIVEPLAYER_DATA_DIR` | `data` (`/data` in Docker) | SQLite database and `settings.json`. |
+| `ARCHIVEPLAYER_DATA_DIR` | `data` (`/data` in Docker) | SQLite database, settings, and the stable discovery ID. |
 | `ARCHIVEPLAYER_STATIC_DIR` | `dist` (`/app/dist` in Docker) | Built frontend files. |
 | `ARCHIVEPLAYER_ALLOW_REGISTRATION` | `false` | Allow anyone to create an account after the owner. |
 | `ARCHIVEPLAYER_SECURE_COOKIES` | `false` | Mark session cookies `Secure`; enable behind HTTPS. |
 | `ARCHIVEPLAYER_SESSION_DAYS` | `30` | Browser session lifetime, clamped to 1–365 days. |
 | `ARCHIVEPLAYER_DEVICE_SESSION_DAYS` | `180` | Paired-device token lifetime, clamped to 1–3650 days. |
-| `ARCHIVEPLAYER_PUBLIC_URL` | unset | Public base URL used in pairing links, e.g. `https://media.example.com`. |
+| `ARCHIVEPLAYER_PUBLIC_URL` | unset | Public base URL used in pairing links and mDNS TXT records, e.g. `https://media.example.com`. |
 | `ARCHIVEPLAYER_CORS_ORIGINS` | unset | Comma-separated browser origins allowed to call the API (webOS/TV wrappers). Native apps do not need it. |
+| `ARCHIVEPLAYER_MDNS` | `true` | Advertise `_archiveplayer._tcp.local` on the LAN when not bound to loopback. |
+| `ARCHIVEPLAYER_SERVER_NAME` | hostname | Friendly name shown by LAN discovery. |
+| `ARCHIVEPLAYER_TRUST_PROXY` | `false` | Trust `X-Forwarded-For` / `X-Forwarded-Proto` from a reverse proxy. |
+| `ARCHIVEPLAYER_RATE_LIMIT_PER_MINUTE` | `240` | General API requests per minute per client IP; `0` disables. |
+| `ARCHIVEPLAYER_AUTH_RATE_LIMIT_PER_MINUTE` | `10` | Login and registration requests per minute per client IP; `0` disables. |
+| `ARCHIVEPLAYER_DEVICE_RATE_LIMIT_PER_MINUTE` | `60` | Device pairing requests per minute per client IP; `0` disables. |
 
 Back up the volume before upgrades:
 
@@ -236,8 +277,8 @@ binary is built with `cargo build --release -p archiveplayer-server`.
 Releases are built by GitHub Actions when a version tag is pushed:
 
 ```bash
-git tag v0.4.0
-git push origin v0.4.0
+git tag v0.5.0
+git push origin v0.5.0
 ```
 
 The tag must match the version in `package.json`, `src-tauri/tauri.conf.json`,
@@ -263,6 +304,8 @@ package settings if you want anonymous pulls.
 In server mode the same SQLite catalog is stored in `ARCHIVEPLAYER_DATA_DIR`:
 
 - `archiveplayer.db` — profiles, library, categories, watch history, sessions.
+- `server-id` — stable discovery identity used by mDNS clients (written with
+  `0600` on Unix).
 - `settings.json` — last-used email and optional TMDB key (written with `0600`
   permissions on Unix).
 
