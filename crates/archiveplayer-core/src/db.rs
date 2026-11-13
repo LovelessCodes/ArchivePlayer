@@ -9,6 +9,7 @@ use std::time::Duration;
 const SCHEMA: &str = include_str!("../migrations/001_init.sql");
 const SESSION_SCHEMA: &str = include_str!("../migrations/002_sessions.sql");
 const DEVICE_SCHEMA: &str = include_str!("../migrations/003_devices.sql");
+const BACKDROP_SCHEMA: &str = include_str!("../migrations/004_backdrops.sql");
 
 const LIBRARY_SELECT: &str = r#"
     SELECT
@@ -18,6 +19,7 @@ const LIBRARY_SELECT: &str = r#"
         mi.media_type,
         mi.thumbnail_url,
         mi.tmdb_poster_url,
+        mi.tmdb_backdrop_url,
         umi.category_name,
         umi.watch_progress_seconds,
         umi.duration_seconds,
@@ -106,6 +108,7 @@ pub struct MediaItemRow {
     pub thumbnail_url: Option<String>,
     pub media_type: String,
     pub tmdb_poster_url: Option<String>,
+    pub tmdb_backdrop_url: Option<String>,
     pub tmdb_id: Option<i64>,
     pub tmdb_media_type: Option<String>,
 }
@@ -118,6 +121,7 @@ pub struct NewMediaItem {
     pub thumbnail_url: Option<String>,
     pub media_type: String,
     pub tmdb_poster_url: Option<String>,
+    pub tmdb_backdrop_url: Option<String>,
     pub tmdb_id: Option<i64>,
     pub tmdb_media_type: Option<String>,
 }
@@ -202,6 +206,9 @@ impl Database {
         }
         if version < 3 {
             connection.execute_batch(DEVICE_SCHEMA)?;
+        }
+        if version < 4 {
+            connection.execute_batch(BACKDROP_SCHEMA)?;
         }
         Ok(Self {
             connection: Mutex::new(connection),
@@ -624,7 +631,7 @@ impl Database {
             Ok(conn
                 .query_row(
                     "SELECT id, identifier, title, description, thumbnail_url, media_type,
-                            tmdb_poster_url, tmdb_id, tmdb_media_type
+                            tmdb_poster_url, tmdb_backdrop_url, tmdb_id, tmdb_media_type
                      FROM media_items WHERE identifier = ?1",
                     params![identifier],
                     map_media,
@@ -638,8 +645,8 @@ impl Database {
             conn.execute(
                 "INSERT INTO media_items (
                     identifier, title, description, thumbnail_url, media_type,
-                    tmdb_poster_url, tmdb_id, tmdb_media_type, created_at
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+                    tmdb_poster_url, tmdb_backdrop_url, tmdb_id, tmdb_media_type, created_at
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
                  ON CONFLICT(identifier) DO NOTHING",
                 params![
                     media.identifier,
@@ -648,6 +655,7 @@ impl Database {
                     media.thumbnail_url,
                     media.media_type,
                     media.tmdb_poster_url,
+                    media.tmdb_backdrop_url,
                     media.tmdb_id,
                     media.tmdb_media_type,
                     now_rfc3339(),
@@ -656,7 +664,7 @@ impl Database {
 
             conn.query_row(
                 "SELECT id, identifier, title, description, thumbnail_url, media_type,
-                        tmdb_poster_url, tmdb_id, tmdb_media_type
+                        tmdb_poster_url, tmdb_backdrop_url, tmdb_id, tmdb_media_type
                  FROM media_items WHERE identifier = ?1",
                 params![media.identifier],
                 map_media,
@@ -674,8 +682,9 @@ impl Database {
                     thumbnail_url = COALESCE(?4, thumbnail_url),
                     media_type = ?5,
                     tmdb_poster_url = COALESCE(?6, tmdb_poster_url),
-                    tmdb_id = COALESCE(?7, tmdb_id),
-                    tmdb_media_type = COALESCE(?8, tmdb_media_type)
+                    tmdb_backdrop_url = COALESCE(?7, tmdb_backdrop_url),
+                    tmdb_id = COALESCE(?8, tmdb_id),
+                    tmdb_media_type = COALESCE(?9, tmdb_media_type)
                  WHERE id = ?1",
                 params![
                     media.id,
@@ -684,6 +693,7 @@ impl Database {
                     media.thumbnail_url,
                     media.media_type,
                     media.tmdb_poster_url,
+                    media.tmdb_backdrop_url,
                     media.tmdb_id,
                     media.tmdb_media_type,
                 ],
@@ -1031,8 +1041,9 @@ fn map_media(row: &Row<'_>) -> rusqlite::Result<MediaItemRow> {
         thumbnail_url: row.get(4)?,
         media_type: row.get(5)?,
         tmdb_poster_url: row.get(6)?,
-        tmdb_id: row.get(7)?,
-        tmdb_media_type: row.get(8)?,
+        tmdb_backdrop_url: row.get(7)?,
+        tmdb_id: row.get(8)?,
+        tmdb_media_type: row.get(9)?,
     })
 }
 
@@ -1044,13 +1055,14 @@ fn map_library_item(row: &Row<'_>) -> rusqlite::Result<LibraryItem> {
         media_type: row.get(3)?,
         thumbnail_url: row.get(4)?,
         tmdb_poster_url: row.get(5)?,
-        category_name: row.get(6)?,
-        watch_progress_seconds: row.get(7)?,
-        duration_seconds: row.get(8)?,
-        current_episode_file_name: row.get(9)?,
-        last_watched: row.get(10)?,
-        is_completed: row.get::<_, i64>(11)? != 0,
-        added_at: row.get(12)?,
+        tmdb_backdrop_url: row.get(6)?,
+        category_name: row.get(7)?,
+        watch_progress_seconds: row.get(8)?,
+        duration_seconds: row.get(9)?,
+        current_episode_file_name: row.get(10)?,
+        last_watched: row.get(11)?,
+        is_completed: row.get::<_, i64>(12)? != 0,
+        added_at: row.get(13)?,
     })
 }
 
@@ -1129,6 +1141,7 @@ mod tests {
             thumbnail_url: None,
             media_type: "movies".into(),
             tmdb_poster_url: None,
+            tmdb_backdrop_url: None,
             tmdb_id: None,
             tmdb_media_type: None,
         })
@@ -1142,6 +1155,46 @@ mod tests {
         assert_eq!(db.user_count().unwrap(), 1);
         assert_eq!(db.user_by_id(user.id).unwrap().unwrap().email, user.email);
         assert!(db.create_user("PERSON@example.com", None, "hash").is_err());
+    }
+
+    #[test]
+    fn stores_wide_backdrop_artwork() {
+        let db = database();
+        let user = seed_user(&db);
+        let media = db
+            .insert_media(&NewMediaItem {
+                identifier: "backdrop-item".into(),
+                title: "Backdrop Item".into(),
+                description: None,
+                thumbnail_url: None,
+                media_type: "movies".into(),
+                tmdb_poster_url: Some("https://image.tmdb.org/t/p/w500/poster.jpg".into()),
+                tmdb_backdrop_url: Some("https://image.tmdb.org/t/p/w1280/backdrop.jpg".into()),
+                tmdb_id: Some(42),
+                tmdb_media_type: Some("movie".into()),
+            })
+            .unwrap();
+        assert_eq!(
+            media.tmdb_backdrop_url.as_deref(),
+            Some("https://image.tmdb.org/t/p/w1280/backdrop.jpg")
+        );
+        let item = db.add_user_media(user.id, media.id, "Movies").unwrap();
+        assert_eq!(
+            item.tmdb_backdrop_url.as_deref(),
+            Some("https://image.tmdb.org/t/p/w1280/backdrop.jpg")
+        );
+
+        let mut updated = media;
+        updated.tmdb_backdrop_url = Some("https://image.tmdb.org/t/p/w1280/new.jpg".into());
+        db.update_media(&updated).unwrap();
+        assert_eq!(
+            db.media_by_identifier("backdrop-item")
+                .unwrap()
+                .unwrap()
+                .tmdb_backdrop_url
+                .as_deref(),
+            Some("https://image.tmdb.org/t/p/w1280/new.jpg")
+        );
     }
 
     #[test]
@@ -1256,6 +1309,37 @@ mod tests {
         assert!(!session.session.public_id.is_empty());
         assert!(session.session.last_seen_at.is_some());
         assert!(db.list_sessions(1, now).unwrap()[0].public_id.len() == 16);
+    }
+
+    #[test]
+    fn upgrades_existing_media_to_v4_with_backdrops() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("legacy-v3.db");
+        {
+            let connection = Connection::open(&path).unwrap();
+            connection.execute_batch(SCHEMA).unwrap();
+            connection.execute_batch(SESSION_SCHEMA).unwrap();
+            connection.execute_batch(DEVICE_SCHEMA).unwrap();
+        }
+
+        let db = Database::open(&path).unwrap();
+        let media = db
+            .insert_media(&NewMediaItem {
+                identifier: "legacy-backdrop".into(),
+                title: "Legacy Backdrop".into(),
+                description: None,
+                thumbnail_url: None,
+                media_type: "movies".into(),
+                tmdb_poster_url: None,
+                tmdb_backdrop_url: Some("https://image.tmdb.org/t/p/w1280/x.jpg".into()),
+                tmdb_id: None,
+                tmdb_media_type: None,
+            })
+            .unwrap();
+        assert_eq!(
+            media.tmdb_backdrop_url.as_deref(),
+            Some("https://image.tmdb.org/t/p/w1280/x.jpg")
+        );
     }
 
     #[test]

@@ -22,6 +22,7 @@ export interface LibraryItem {
   mediaType: string;
   thumbnailUrl: string | null;
   tmdbPosterUrl: string | null;
+  tmdbBackdropUrl?: string | null;
   categoryName: string;
   watchProgressSeconds: number;
   durationSeconds: number;
@@ -112,6 +113,7 @@ export interface MediaDetails {
   mediaType: string;
   thumbnailUrl: string | null;
   tmdbPosterUrl: string | null;
+  tmdbBackdropUrl?: string | null;
   tmdbId: number | null;
   tmdbMediaType: string | null;
   videoFiles: string[];

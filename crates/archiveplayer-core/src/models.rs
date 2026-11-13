@@ -45,6 +45,7 @@ pub struct LibraryItem {
     pub media_type: String,
     pub thumbnail_url: Option<String>,
     pub tmdb_poster_url: Option<String>,
+    pub tmdb_backdrop_url: Option<String>,
     pub category_name: String,
     pub watch_progress_seconds: i64,
     pub duration_seconds: i64,
@@ -175,6 +176,7 @@ pub struct MediaDetails {
     pub media_type: String,
     pub thumbnail_url: Option<String>,
     pub tmdb_poster_url: Option<String>,
+    pub tmdb_backdrop_url: Option<String>,
     pub tmdb_id: Option<i64>,
     pub tmdb_media_type: Option<String>,
     pub video_files: Vec<String>,
@@ -237,6 +239,7 @@ pub struct UploadedMedia {
     pub description: Option<String>,
     pub thumbnail_url: Option<String>,
     pub tmdb_poster_url: Option<String>,
+    pub tmdb_backdrop_url: Option<String>,
     pub tmdb_id: Option<i64>,
     pub tmdb_media_type: Option<String>,
 }

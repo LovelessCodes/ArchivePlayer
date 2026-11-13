@@ -109,6 +109,9 @@ impl Service {
         let tmdb_poster_url = tmdb_match
             .as_ref()
             .and_then(|matched| matched.poster_url.clone());
+        let tmdb_backdrop_url = tmdb_match
+            .as_ref()
+            .and_then(|matched| matched.backdrop_url.clone());
         let thumbnail_url = tmdb_poster_url.clone().unwrap_or(archive_thumbnail);
 
         self.db.insert_media(&NewMediaItem {
@@ -118,6 +121,7 @@ impl Service {
             thumbnail_url: Some(thumbnail_url),
             media_type: metadata.media_type.clone(),
             tmdb_poster_url,
+            tmdb_backdrop_url,
             tmdb_id: tmdb_match.as_ref().map(|matched| matched.tmdb_id),
             tmdb_media_type: tmdb_match
                 .as_ref()
@@ -131,6 +135,7 @@ impl Service {
         metadata: &ArchiveMetadata,
     ) -> CoreResult<MediaItemRow> {
         let needs_upgrade = media.tmdb_poster_url.is_none()
+            || media.tmdb_backdrop_url.is_none()
             || media.tmdb_id.is_none()
             || is_messy_title(&media.title)
             || media.description.is_none();
@@ -150,6 +155,7 @@ impl Service {
         }
 
         if (media.tmdb_poster_url.is_none()
+            || media.tmdb_backdrop_url.is_none()
             || media.tmdb_id.is_none()
             || is_messy_title(&media.title))
             && self.tmdb.is_configured()
@@ -164,6 +170,9 @@ impl Service {
             if let Some(poster) = matched.poster_url {
                 media.tmdb_poster_url = Some(poster.clone());
                 media.thumbnail_url = Some(poster);
+            }
+            if let Some(backdrop) = matched.backdrop_url {
+                media.tmdb_backdrop_url = Some(backdrop);
             }
         }
 
@@ -328,6 +337,7 @@ impl Service {
             media_type: media.media_type,
             thumbnail_url: media.thumbnail_url,
             tmdb_poster_url: media.tmdb_poster_url,
+            tmdb_backdrop_url: media.tmdb_backdrop_url,
             tmdb_id: media.tmdb_id,
             tmdb_media_type: media.tmdb_media_type,
             video_files: metadata.video_files,
@@ -372,6 +382,7 @@ impl Service {
                 metadata.identifier
             )),
             tmdb_poster_url: None,
+            tmdb_backdrop_url: None,
             tmdb_id: None,
             tmdb_media_type: None,
         }

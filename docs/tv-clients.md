@@ -158,6 +158,11 @@ GET /api/library
 Authorization: Bearer <token>
 ```
 
+Library items carry optional `tmdbPosterUrl` (2:3) and `tmdbBackdropUrl`
+(16:9) fields. Both are absolute TMDB URLs; a TV may fetch them directly, and
+should keep its own fallback when either is absent. The detail response repeats
+the same fields. `thumbnailUrl` remains a smaller fallback, not a wide image.
+
 The same session accepts a browser cookie, but native clients should always use
 the bearer header. Session tokens are checked against the database on every
 request, so revocation takes effect immediately.

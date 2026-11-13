@@ -9,7 +9,8 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 const API_BASE: &str = "https://api.themoviedb.org/3";
-const IMAGE_BASE: &str = "https://image.tmdb.org/t/p/w500";
+const POSTER_BASE: &str = "https://image.tmdb.org/t/p/w500";
+const BACKDROP_BASE: &str = "https://image.tmdb.org/t/p/w1280";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,6 +18,7 @@ pub struct TmdbMatch {
     pub tmdb_id: i64,
     pub title: String,
     pub poster_url: Option<String>,
+    pub backdrop_url: Option<String>,
     pub media_type: String,
 }
 
@@ -180,7 +182,11 @@ impl TmdbClient {
             poster_url: best
                 .poster_path
                 .filter(|path| !path.is_empty())
-                .map(|path| format!("{IMAGE_BASE}{path}")),
+                .map(|path| format!("{POSTER_BASE}{path}")),
+            backdrop_url: best
+                .backdrop_path
+                .filter(|path| !path.is_empty())
+                .map(|path| format!("{BACKDROP_BASE}{path}")),
             media_type: media_type.to_string(),
         }))
     }
@@ -235,7 +241,7 @@ impl TmdbClient {
                     still_url: episode
                         .still_path
                         .filter(|path| !path.is_empty())
-                        .map(|path| format!("{IMAGE_BASE}{path}")),
+                        .map(|path| format!("{POSTER_BASE}{path}")),
                 });
             }
         }
@@ -316,6 +322,7 @@ struct TmdbSearchResult {
     title: Option<String>,
     name: Option<String>,
     poster_path: Option<String>,
+    backdrop_path: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
