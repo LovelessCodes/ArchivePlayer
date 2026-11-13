@@ -176,8 +176,8 @@ _archiveplayer._tcp.local
 ```
 
 The TXT record includes the friendly name, a stable server ID, the API version,
-and `ARCHIVEPLAYER_PUBLIC_URL` when configured. A TV can list nearby servers
-and connect with one tap instead of asking for an IP address.
+a preferred LAN `addr`, and `ARCHIVEPLAYER_PUBLIC_URL` when configured. A TV can
+list nearby servers and connect with one tap instead of asking for an IP address.
 
 mDNS is best-effort and optional. It is skipped when the server binds to
 `127.0.0.1`, and Docker's default bridge network does not forward multicast to

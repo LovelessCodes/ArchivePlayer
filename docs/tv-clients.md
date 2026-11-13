@@ -31,13 +31,20 @@ TXT records:
 | `api` | API generation, currently `1`. |
 | `version` | Server package version, e.g. `0.5.0`. |
 | `path` | Web root, currently `/`. |
+| `addr` | Preferred LAN IPv4 address selected by the server. |
 | `url` | Optional public HTTPS base URL from `ARCHIVEPLAYER_PUBLIC_URL`. |
 
 On Android TV, use `NsdManager` to browse for `_archiveplayer._tcp` and resolve
-the service. Prefer the `url` property when it is present and valid HTTPS;
-otherwise build `http://<resolved-host>:<port>` from the SRV record. Show the
-discovered name and URL before connecting. Discovery is unauthenticated, so
-treat it as a hint, not proof of identity.
+the service. Build the LAN URL from `addr` when it is present, otherwise from a
+resolved private IPv4 address; use `url` for the public HTTPS fallback. Ignore
+IPv6 link-local addresses because they are unusable without a scope identifier.
+Show the discovered name and URL before connecting. Discovery is unauthenticated,
+so treat it as a hint, not proof of identity.
+
+`addr` matters on hosts with several interfaces. A server can otherwise advertise
+a Docker bridge or a link-local IPv6 address before the address a television can
+actually reach. The server takes the hint from an explicit bind address, or asks
+the routing table which source address it would use for an outbound connection.
 
 The advertisement is skipped when the server binds to loopback. Docker bridge
 networks do not forward multicast to the LAN; use host networking or a host-side
