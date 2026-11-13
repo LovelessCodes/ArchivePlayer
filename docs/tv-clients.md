@@ -321,8 +321,9 @@ that setting all clients share one bucket.
 ### LG webOS
 
 - A native webOS client should call `/api/playback/{identifier}?platform=webos`
-  and play `playbackPlan.url` through `com.webos.media`. See the webOS client
-  repository for the SDL2/GLES2 shell.
+  and play `playbackPlan.url` through `com.webos.media`. See
+  [ArchivePlayer-webOS](https://github.com/LovelessCodes/ArchivePlayer-webOS)
+  for the native SDL2 shell and unsigned `.ipk` release.
 - A webOS web app is a Chromium runtime, so the server must allow its origin.
   Set `ARCHIVEPLAYER_CORS_ORIGINS` to the packaged app origin (or `null` for a
   `file://` package) and restart the server.
