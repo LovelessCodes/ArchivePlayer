@@ -4,6 +4,7 @@ pub mod db;
 pub mod episodes;
 pub mod error;
 pub mod models;
+pub mod playback;
 pub mod service;
 pub mod settings;
 pub mod title_cleaner;

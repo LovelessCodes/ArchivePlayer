@@ -345,15 +345,30 @@ async fn category_suggestions(
 
 // --------------------------------------------------------------- playback
 
+#[derive(Deserialize)]
+struct PlaybackQuery {
+    platform: Option<String>,
+    file: Option<String>,
+}
+
 async fn get_playback_details(
     State(state): State<SharedState>,
     auth: AuthContext,
     Path(identifier): Path<String>,
+    Query(query): Query<PlaybackQuery>,
 ) -> ApiResult<Json<MediaDetails>> {
     auth.require_scope(SCOPE_LIBRARY_READ)?;
     let user = &auth.user;
     Ok(Json(
-        state.service.playback_details(user.id, &identifier).await?,
+        state
+            .service
+            .playback_details(
+                user.id,
+                &identifier,
+                query.platform.as_deref(),
+                query.file.as_deref(),
+            )
+            .await?,
     ))
 }
 

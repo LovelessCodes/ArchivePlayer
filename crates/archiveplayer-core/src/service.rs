@@ -6,6 +6,7 @@ use crate::models::{
     ArchiveMetadata, CategorySuggestion, Episode, MediaDetails, SettingsInfo, UploadedMedia,
     VideoFileUrl,
 };
+use crate::playback;
 use crate::settings::SettingsStore;
 use crate::tmdb::TmdbClient;
 use crate::util::parse_archive_identifier;
@@ -221,6 +222,8 @@ impl Service {
         &self,
         user_id: i64,
         identifier: &str,
+        platform: Option<&str>,
+        requested_file: Option<&str>,
     ) -> CoreResult<MediaDetails> {
         let media = self
             .db
@@ -281,14 +284,42 @@ impl Service {
             None => Vec::new(),
         };
 
-        let video_file_urls = metadata
-            .video_files
-            .iter()
-            .map(|file_name| VideoFileUrl {
-                file_name: file_name.clone(),
-                url: self.archive.download_url(identifier, file_name),
-            })
-            .collect();
+        let video_file_urls: Vec<VideoFileUrl> = if metadata.video_file_details.is_empty() {
+            metadata
+                .video_files
+                .iter()
+                .map(|file_name| VideoFileUrl {
+                    file_name: file_name.clone(),
+                    url: self.archive.download_url(identifier, file_name),
+                    format: None,
+                    mime_type: playback::mime_type_for_file(file_name).map(str::to_string),
+                    size_bytes: None,
+                    length_seconds: None,
+                    width: None,
+                    height: None,
+                    video_codec: None,
+                })
+                .collect()
+        } else {
+            metadata
+                .video_file_details
+                .iter()
+                .map(|file| VideoFileUrl {
+                    file_name: file.name.clone(),
+                    url: self.archive.download_url(identifier, &file.name),
+                    format: file.format.clone(),
+                    mime_type: playback::mime_type_for_file(&file.name).map(str::to_string),
+                    size_bytes: file.size_bytes,
+                    length_seconds: file.length_seconds,
+                    width: file.width,
+                    height: file.height,
+                    video_codec: playback::infer_video_codec(file.format.as_deref(), &file.name)
+                        .map(str::to_string),
+                })
+                .collect()
+        };
+        let playback_plan =
+            playback::build_playback_plan(&video_file_urls, platform, requested_file);
 
         Ok(MediaDetails {
             identifier: media.identifier,
@@ -301,6 +332,7 @@ impl Service {
             tmdb_media_type: media.tmdb_media_type,
             video_files: metadata.video_files,
             video_file_urls,
+            playback_plan,
             episodes,
             watch_progress_seconds: user_media
                 .as_ref()

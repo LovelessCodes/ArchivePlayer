@@ -80,6 +80,29 @@ export interface EpisodeProgress {
 export interface VideoFileUrl {
   fileName: string;
   url: string;
+  format: string | null;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  lengthSeconds: number | null;
+  width: number | null;
+  height: number | null;
+  videoCodec: string | null;
+}
+
+export interface PlaybackPlan {
+  platform: string;
+  fileName: string;
+  url: string;
+  mimeType: string | null;
+  format: string | null;
+  container: string | null;
+  videoCodec: string | null;
+  sizeBytes: number | null;
+  lengthSeconds: number | null;
+  width: number | null;
+  height: number | null;
+  compatible: boolean;
+  reason: string | null;
 }
 
 export interface MediaDetails {
@@ -93,6 +116,7 @@ export interface MediaDetails {
   tmdbMediaType: string | null;
   videoFiles: string[];
   videoFileUrls: VideoFileUrl[];
+  playbackPlan: PlaybackPlan | null;
   episodes: Episode[];
   watchProgressSeconds: number;
   durationSeconds: number;

@@ -116,9 +116,54 @@ pub struct EpisodeProgress {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ArchiveVideoFile {
+    pub name: String,
+    pub format: Option<String>,
+    pub size_bytes: Option<u64>,
+    pub length_seconds: Option<f64>,
+    pub width: Option<i64>,
+    pub height: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct VideoFileUrl {
     pub file_name: String,
     pub url: String,
+    #[serde(default)]
+    pub format: Option<String>,
+    #[serde(default)]
+    pub mime_type: Option<String>,
+    #[serde(default)]
+    pub size_bytes: Option<u64>,
+    #[serde(default)]
+    pub length_seconds: Option<f64>,
+    #[serde(default)]
+    pub width: Option<i64>,
+    #[serde(default)]
+    pub height: Option<i64>,
+    #[serde(default)]
+    pub video_codec: Option<String>,
+}
+
+/// The file a client should try first, chosen for its platform.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlaybackPlan {
+    pub platform: String,
+    pub file_name: String,
+    pub url: String,
+    pub mime_type: Option<String>,
+    pub format: Option<String>,
+    pub container: Option<String>,
+    pub video_codec: Option<String>,
+    pub size_bytes: Option<u64>,
+    pub length_seconds: Option<f64>,
+    pub width: Option<i64>,
+    pub height: Option<i64>,
+    /// False when the selected file is known to need a different decoder.
+    pub compatible: bool,
+    pub reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -134,6 +179,8 @@ pub struct MediaDetails {
     pub tmdb_media_type: Option<String>,
     pub video_files: Vec<String>,
     pub video_file_urls: Vec<VideoFileUrl>,
+    #[serde(default)]
+    pub playback_plan: Option<PlaybackPlan>,
     pub episodes: Vec<Episode>,
     pub watch_progress_seconds: i64,
     pub duration_seconds: i64,
@@ -153,6 +200,8 @@ pub struct ArchiveMetadata {
     pub description: Option<String>,
     pub media_type: String,
     pub video_files: Vec<String>,
+    #[serde(default)]
+    pub video_file_details: Vec<ArchiveVideoFile>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

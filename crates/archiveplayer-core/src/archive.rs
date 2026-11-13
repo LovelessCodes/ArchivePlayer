@@ -1,5 +1,8 @@
 use crate::error::{CoreError, CoreResult};
-use crate::models::{ArchiveMetadata, ArchiveSearchResponse, ArchiveSearchResult};
+use crate::models::{
+    ArchiveMetadata, ArchiveSearchResponse, ArchiveSearchResult, ArchiveVideoFile,
+};
+use crate::playback;
 use crate::util::{download_url, natural_cmp, strip_html};
 use serde_json::Value;
 use std::cmp::Ordering;
@@ -153,23 +156,22 @@ impl ArchiveClient {
         let mut files = Vec::new();
         if let Some(file_nodes) = value.get("files").and_then(Value::as_array) {
             for file in file_nodes {
-                let Some(name) = file.get("name").and_then(Value::as_str) else {
-                    continue;
-                };
-                if is_video_file(name) {
-                    files.push(name.to_string());
+                if let Some(file) = archive_video_file(file) {
+                    files.push(file);
                 }
             }
         }
 
         let files = best_video_files(files);
+        let video_files = files.iter().map(|file| file.name.clone()).collect();
 
         Ok(ArchiveMetadata {
             identifier: identifier.to_string(),
             title,
             description,
             media_type,
-            video_files: files,
+            video_files,
+            video_file_details: files,
         })
     }
 
@@ -199,6 +201,60 @@ fn value_to_i64(value: &Value) -> Option<i64> {
     }
 }
 
+fn value_to_u64(value: &Value) -> Option<u64> {
+    match value {
+        Value::Number(number) => number.as_u64(),
+        Value::String(text) => text.parse().ok(),
+        _ => None,
+    }
+}
+
+fn value_to_seconds(value: &Value) -> Option<f64> {
+    match value {
+        Value::Number(number) => number.as_f64(),
+        Value::String(text) => parse_length(text),
+        _ => None,
+    }
+}
+
+fn parse_length(text: &str) -> Option<f64> {
+    let text = text.trim();
+    if text.is_empty() {
+        return None;
+    }
+    if !text.contains(':') {
+        return text.parse().ok();
+    }
+    let parts: Vec<&str> = text.split(':').collect();
+    let values: Vec<f64> = parts
+        .iter()
+        .map(|part| part.trim().parse().ok())
+        .collect::<Option<_>>()?;
+    if values.iter().any(|value| *value < 0.0) {
+        return None;
+    }
+    match values.as_slice() {
+        [minutes, seconds] => Some(minutes * 60.0 + seconds),
+        [hours, minutes, seconds] => Some(hours * 3600.0 + minutes * 60.0 + seconds),
+        _ => None,
+    }
+}
+
+fn archive_video_file(file: &Value) -> Option<ArchiveVideoFile> {
+    let name = file.get("name").and_then(Value::as_str)?;
+    if !is_video_file(name) {
+        return None;
+    }
+    Some(ArchiveVideoFile {
+        name: name.to_string(),
+        format: file.get("format").and_then(value_to_string),
+        size_bytes: file.get("size").and_then(value_to_u64),
+        length_seconds: file.get("length").and_then(value_to_seconds),
+        width: file.get("width").and_then(value_to_i64),
+        height: file.get("height").and_then(value_to_i64),
+    })
+}
+
 pub fn is_video_file(file_name: &str) -> bool {
     let extension = file_name
         .rsplit_once('.')
@@ -212,55 +268,63 @@ pub fn is_video_file(file_name: &str) -> bool {
 
 /// Collapse alternate encodings of the same video (for example an item that
 /// ships both `movie.mp4` and `movie.ogv`) into the single most playable file.
-fn best_video_files(files: Vec<String>) -> Vec<String> {
-    let mut by_stem: BTreeMap<String, String> = BTreeMap::new();
+fn best_video_files(files: Vec<ArchiveVideoFile>) -> Vec<ArchiveVideoFile> {
+    let mut by_stem: BTreeMap<String, ArchiveVideoFile> = BTreeMap::new();
 
-    for file_name in files {
-        let stem = file_name
+    for file in files {
+        let stem = file
+            .name
             .rsplit_once('.')
             .map(|(stem, _)| stem.to_string())
-            .unwrap_or_else(|| file_name.clone());
+            .unwrap_or_else(|| file.name.clone());
 
         match by_stem.get(&stem) {
             Some(existing) => {
-                let rank = playability(&file_name);
+                let rank = playability(&file);
                 let existing_rank = playability(existing);
                 if rank < existing_rank
                     || (rank == existing_rank
-                        && natural_cmp(&file_name, existing) == Ordering::Less)
+                        && natural_cmp(&file.name, &existing.name) == Ordering::Less)
                 {
-                    by_stem.insert(stem, file_name);
+                    by_stem.insert(stem, file);
                 }
             }
             None => {
-                by_stem.insert(stem, file_name);
+                by_stem.insert(stem, file);
             }
         }
     }
 
-    let mut files: Vec<String> = by_stem.into_values().collect();
-    files.sort_by(|left, right| natural_cmp(left, right));
+    let mut files: Vec<ArchiveVideoFile> = by_stem.into_values().collect();
+    files.sort_by(|left, right| natural_cmp(&left.name, &right.name));
     files
 }
 
-fn playability(file_name: &str) -> u8 {
-    let extension = file_name
-        .rsplit_once('.')
-        .map(|(_, extension)| extension.to_ascii_lowercase())
-        .unwrap_or_default();
-    match extension.as_str() {
-        "mp4" | "m4v" | "webm" => 0,
-        "mkv" | "ogv" => 1,
-        "avi" => 2,
+fn playability(file: &ArchiveVideoFile) -> (u8, u8) {
+    let extension_rank = match playback::extension(&file.name).as_deref() {
+        Some("mp4" | "m4v") => 0,
+        Some("webm") => 0,
+        Some("mkv" | "ogv") => 1,
+        Some("avi") => 2,
         _ => 3,
-    }
+    };
+    let codec_rank = match playback::infer_video_codec(file.format.as_deref(), &file.name) {
+        Some("h264") => 0,
+        None => 1,
+        Some("mpeg4") => 2,
+        Some("hevc") => 3,
+        Some("av1" | "vp9" | "vp8") => 4,
+        Some("theora" | "mpeg2") => 5,
+        _ => 6,
+    };
+    (extension_rank, codec_rank)
 }
 
 #[allow(dead_code)]
-fn compare_files(left: &str, right: &str) -> Ordering {
+fn compare_files(left: &ArchiveVideoFile, right: &ArchiveVideoFile) -> Ordering {
     playability(left)
         .cmp(&playability(right))
-        .then_with(|| natural_cmp(left, right))
+        .then_with(|| natural_cmp(&left.name, &right.name))
 }
 
 #[cfg(test)]
@@ -275,16 +339,27 @@ mod tests {
         assert!(!is_video_file("movie"));
     }
 
+    fn video(name: &str, format: Option<&str>) -> ArchiveVideoFile {
+        ArchiveVideoFile {
+            name: name.into(),
+            format: format.map(str::to_string),
+            size_bytes: None,
+            length_seconds: None,
+            width: None,
+            height: None,
+        }
+    }
+
     #[test]
     fn collapses_alternate_video_encodings() {
         let files = best_video_files(vec![
-            "movie.ogv".into(),
-            "movie.mp4".into(),
-            "episode-01.webm".into(),
-            "episode-02.mkv".into(),
+            video("movie.ogv", Some("Ogg Video")),
+            video("movie.mp4", Some("MPEG4")),
+            video("episode-01.webm", None),
+            video("episode-02.mkv", None),
         ]);
         assert_eq!(
-            files,
+            files.into_iter().map(|file| file.name).collect::<Vec<_>>(),
             vec![
                 "episode-01.webm".to_string(),
                 "episode-02.mkv".to_string(),
@@ -294,11 +369,53 @@ mod tests {
     }
 
     #[test]
+    fn keeps_the_better_codec_for_the_same_stem() {
+        let files = best_video_files(vec![
+            video("movie.mp4", Some("MPEG4")),
+            video("movie.ia.mp4", Some("MPEG4")),
+            video("movie.ia.mp4", Some("h.264 IA")),
+        ]);
+        let movie = files
+            .iter()
+            .find(|file| file.name == "movie.ia.mp4")
+            .unwrap();
+        assert_eq!(movie.format.as_deref(), Some("h.264 IA"));
+    }
+
+    #[test]
     fn reads_archive_value_shapes() {
         assert_eq!(
             value_to_string(&serde_json::json!(["One", "Two"])).as_deref(),
             Some("One")
         );
         assert_eq!(value_to_i64(&serde_json::json!("42")), Some(42));
+        assert_eq!(value_to_u64(&serde_json::json!("1234")), Some(1234));
+        assert_eq!(
+            value_to_seconds(&serde_json::json!("7199.99")),
+            Some(7199.99)
+        );
+        assert_eq!(
+            value_to_seconds(&serde_json::json!("1:02:03")),
+            Some(3723.0)
+        );
+        assert_eq!(value_to_seconds(&serde_json::json!("02:03")), Some(123.0));
+    }
+
+    #[test]
+    fn reads_richer_file_metadata() {
+        let file = archive_video_file(&serde_json::json!({
+            "name": "movie.mp4",
+            "format": "h.264 IA",
+            "size": "1854950726",
+            "length": "7199.99",
+            "width": "640",
+            "height": 360
+        }))
+        .unwrap();
+        assert_eq!(file.format.as_deref(), Some("h.264 IA"));
+        assert_eq!(file.size_bytes, Some(1_854_950_726));
+        assert_eq!(file.length_seconds, Some(7199.99));
+        assert_eq!(file.width, Some(640));
+        assert_eq!(file.height, Some(360));
     }
 }

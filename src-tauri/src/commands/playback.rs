@@ -9,7 +9,10 @@ pub async fn get_playback_details(
     identifier: String,
 ) -> CoreResult<MediaDetails> {
     let user = state.current_user()?;
-    state.service.playback_details(user.id, &identifier).await
+    state
+        .service
+        .playback_details(user.id, &identifier, None, None)
+        .await
 }
 
 #[tauri::command]

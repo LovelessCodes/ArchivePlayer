@@ -60,6 +60,7 @@ compatible.
 | Method | Path | Authentication | Purpose |
 | --- | --- | --- | --- |
 | `GET` | `/api/health` | none | Health and API version. |
+| `GET` | `/api/auth/status` | none | Current user, registration state, and runtime. |
 | `POST` | `/api/device/start` | none | Start a pairing request. |
 | `POST` | `/api/device/token` | device code | Poll for approval and redeem the token. |
 | `POST` | `/api/device/lookup` | browser cookie | Inspect a pending request by user code. |
@@ -67,7 +68,9 @@ compatible.
 | `GET` | `/api/devices` | browser cookie | List the signed-in user's sessions. |
 | `DELETE` | `/api/devices/{id}` | browser cookie | Revoke one session. |
 | `GET` | `/api/library` | bearer token or cookie | Read the library. |
-| `GET` | `/api/playback/{identifier}` | bearer token or cookie | Get video URLs and episode data. |
+| `GET` | `/api/library/continue-watching` | bearer token or cookie | Read titles with saved progress. |
+| `GET` | `/api/search?q={query}&page={page}` | bearer token or cookie | Search Archive.org. |
+| `GET` | `/api/playback/{identifier}?platform={platform}&file={file}` | bearer token or cookie | Get video URLs, episode data, and a playback plan. |
 | `PUT` | `/api/playback/{identifier}/progress` | bearer token or cookie | Save watch progress. |
 | `POST` | `/api/playback/{identifier}/completed` | bearer token or cookie | Mark an episode or title finished. |
 
@@ -170,6 +173,59 @@ The token carries scopes:
 Requests outside the granted scopes return `HTTP 403` with code `forbidden`.
 A TV should normally request only `library:read` and `progress:write`.
 
+### Playback selection
+
+Every playback response includes the raw files and a server-selected
+`playbackPlan`. Ask for the plan that matches your player:
+
+```http
+GET /api/playback/57afnt64nightofthelivingdeadv2?platform=webos
+Authorization: Bearer <token>
+```
+
+For a specific episode or quality, add the exact `fileName` from the response:
+
+```http
+GET /api/playback/the_twilight_zone?platform=webos&file=The.Twilight.Zone.S01E01.mp4
+```
+
+The plan looks like this:
+
+```json
+{
+  "playbackPlan": {
+    "platform": "webos",
+    "fileName": "57 A FNT # 64 Night of the Living Dead V2.ia.mp4",
+    "url": "https://archive.org/download/…/57%20A%20FNT%20%23%2064%20Night%20of%20the%20Living%20Dead%20V2.ia.mp4",
+    "mimeType": "video/mp4",
+    "format": "h.264 IA",
+    "container": "mp4",
+    "videoCodec": "h264",
+    "sizeBytes": 1854950726,
+    "lengthSeconds": 7199.99,
+    "width": 640,
+    "height": 360,
+    "compatible": true,
+    "reason": null
+  }
+}
+```
+
+`compatible: false` means the selected file is known to need a decoder the
+requested platform cannot rely on; show `reason` rather than starting playback.
+`playbackPlan` is `null` when the item has no video files. The plan is a
+recommendation, not an access-control decision: the same URLs are returned in
+`videoFileUrls`, which now also carry `format`, `mimeType`, `sizeBytes`,
+`lengthSeconds`, `width`, `height`, and `videoCodec`.
+
+`platform` accepts `webos`, `androidtv`, `web`, or `generic` (the default). A
+native webOS client should send `platform=webos` and use the returned MP4; a
+browser player can ignore the plan and keep using `videoFileUrls`.
+
+`durationSeconds` is the duration the user's player saved with its progress, not
+the Archive.org file length. It is `0` until the client has saved progress; use
+`playbackPlan.lengthSeconds` when a duration is needed before playback starts.
+
 ## 4. Approval and revocation
 
 In a signed-in browser, open `/#/activate?code=XQK8-NM99` (or enter the code on
@@ -249,6 +305,9 @@ that setting all clients share one bucket.
 
 ### LG webOS
 
+- A native webOS client should call `/api/playback/{identifier}?platform=webos`
+  and play `playbackPlan.url` through `com.webos.media`. See the webOS client
+  repository for the SDL2/GLES2 shell.
 - A webOS web app is a Chromium runtime, so the server must allow its origin.
   Set `ARCHIVEPLAYER_CORS_ORIGINS` to the packaged app origin (or `null` for a
   `file://` package) and restart the server.
