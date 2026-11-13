@@ -80,7 +80,8 @@ device from a signed-in browser, not from the device itself.
 ## 1. Start pairing
 
 The TV sends a friendly name and optional scopes. `library:read` and
-`progress:write` are the defaults.
+`progress:write` are the defaults; a client that also adds titles asks for
+`library:write`.
 
 ```http
 POST /api/device/start
@@ -171,7 +172,9 @@ The token carries scopes:
 | `settings:manage` | Server settings; browser sessions only. |
 
 Requests outside the granted scopes return `HTTP 403` with code `forbidden`.
-A TV should normally request only `library:read` and `progress:write`.
+A playback-only TV should request `library:read` and `progress:write`; the webOS
+client also requests `library:write` so it can add an Archive.org title from the
+search screen.
 
 ### Playback selection
 
